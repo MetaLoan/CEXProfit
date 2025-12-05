@@ -278,6 +278,28 @@ function syncDisplayTime() {
   document.getElementById('displayTime').value = timeToSync;
 }
 
+// 根据方向、价格和杠杆自动计算收益率
+function calculateYield() {
+  const direction = document.getElementById('direction').value;
+  const entPrice = parseFloat(document.getElementById('entPrice').value) || 0;
+  const lastPrice = parseFloat(document.getElementById('lastPrice').value) || 0;
+  const leverage = parseFloat(document.getElementById('leverage').value) || 1;
+  
+  if (entPrice <= 0 || lastPrice <= 0) return;
+  
+  let yieldPercent;
+  if (direction === 'long') {
+    // 做多：(当前价格 - 开仓价格) / 开仓价格 * 杠杆 * 100
+    yieldPercent = ((lastPrice - entPrice) / entPrice) * leverage * 100;
+  } else {
+    // 做空：(开仓价格 - 当前价格) / 开仓价格 * 杠杆 * 100
+    yieldPercent = ((entPrice - lastPrice) / entPrice) * leverage * 100;
+  }
+  
+  document.getElementById('yield').value = yieldPercent.toFixed(2);
+  saveCache();
+}
+
 // 获取历史价格
 async function fetchPrices() {
   const tradepair = document.getElementById('tradepair').value.toUpperCase();
