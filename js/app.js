@@ -270,10 +270,12 @@ function toggleManualTime() {
 function syncDisplayTime() {
   if (isManualTimeMode) return;
   
-  const closeTimeStr = document.getElementById('closeTime').value;
-  if (closeTimeStr) {
-    document.getElementById('displayTime').value = closeTimeStr;
+  // 优先使用平仓时间，否则使用当前时间
+  let timeToSync = document.getElementById('closeTime').value;
+  if (!timeToSync) {
+    timeToSync = formatDateTimeLocal(new Date());
   }
+  document.getElementById('displayTime').value = timeToSync;
 }
 
 // 获取历史价格
@@ -477,16 +479,17 @@ function getVariables() {
   
   let finalTime;
   
+  // 获取显示时间（自动模式下已同步平仓时间）
+  const displayTimeStr = document.getElementById('displayTime').value;
+  const displayTime = displayTimeStr ? new Date(displayTimeStr) : new Date();
+  
   if (isManualTimeMode) {
     // 手动模式：直接使用显示时间，不进行时区转换
-    const displayTimeStr = document.getElementById('displayTime').value;
-    finalTime = displayTimeStr ? new Date(displayTimeStr) : new Date();
+    finalTime = displayTime;
   } else {
-    // 自动模式：使用平仓时间 + 时区转换
-    const closeTimeStr = document.getElementById('closeTime').value;
-    const closeTime = closeTimeStr ? new Date(closeTimeStr) : new Date();
+    // 自动模式：使用显示时间 + 时区转换
     const timezone = parseInt(document.getElementById('timezone').value) || 8;
-    finalTime = convertToTimezone(closeTime, timezone);
+    finalTime = convertToTimezone(displayTime, timezone);
   }
   
   const dirKey = action ? `${action}_${direction}` : direction;
