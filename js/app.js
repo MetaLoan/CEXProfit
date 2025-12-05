@@ -73,6 +73,7 @@ const lbankenConfig = {
 let currentConfig = null;
 let currentImageData = null;
 let customBgDataUrl = null;
+let isManualTimeMode = false; // 是否手动编辑显示时间模式
 
 // 默认底图（优先使用 Base64，备选使用路径）
 const DEFAULT_BG_SRC = (typeof DEFAULT_BG_BASE64 !== 'undefined') ? DEFAULT_BG_BASE64 : 'assets/background.jpg';
@@ -84,17 +85,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 设置默认时间
   const now = new Date();
-  if (!document.getElementById('displayTime').value) {
-    document.getElementById('displayTime').value = formatDateTimeLocal(now);
-  }
-  
   const entTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
   if (!document.getElementById('entTime').value) {
     document.getElementById('entTime').value = formatDateTimeLocal(entTime);
   }
   if (!document.getElementById('closeTime').value) {
     document.getElementById('closeTime').value = formatDateTimeLocal(now);
   }
+  
+  // 如果不是手动模式，同步平仓时间到显示时间
+  if (!isManualTimeMode) {
+    syncDisplayTime();
+  }
+  
+  // 监听平仓时间变化，自动同步到显示时间
+  document.getElementById('closeTime').addEventListener('change', syncDisplayTime);
   
   // 监听输入变化，自动保存
   setupAutoSave();
@@ -138,7 +144,8 @@ function saveCache() {
     closeTime: document.getElementById('closeTime').value,
     configSelect: document.getElementById('configSelect').value,
     customBgDataUrl: customBgDataUrl,
-    timezone: document.getElementById('timezone').value
+    timezone: document.getElementById('timezone').value,
+    isManualTimeMode: isManualTimeMode
   };
   
   localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
@@ -181,6 +188,20 @@ function loadCache() {
       document.getElementById('timezone').value = cache.timezone;
     }
     
+    if (cache.isManualTimeMode) {
+      isManualTimeMode = true;
+      const displayTimeInput = document.getElementById('displayTime');
+      const editBtn = document.getElementById('editTimeBtn');
+      const timeHint = document.getElementById('timeHint');
+      const timezoneSelect = document.getElementById('timezone');
+      
+      displayTimeInput.disabled = false;
+      editBtn.textContent = '🔄 自动';
+      timeHint.textContent = '手动模式：时区转换已禁用';
+      timeHint.style.color = '#FF9500';
+      timezoneSelect.disabled = true;
+    }
+    
     console.log('配置已从缓存恢复');
   } catch (e) {
     console.warn('加载缓存失败:', e);
@@ -215,6 +236,44 @@ function toggleAutoCalc() {
   const autoCalc = document.getElementById('autoCalcPrice').checked;
   document.getElementById('manualPriceSection').style.display = autoCalc ? 'none' : 'block';
   document.getElementById('autoCalcSection').style.display = autoCalc ? 'block' : 'none';
+}
+
+// 切换手动编辑显示时间模式
+function toggleManualTime() {
+  isManualTimeMode = !isManualTimeMode;
+  const displayTimeInput = document.getElementById('displayTime');
+  const editBtn = document.getElementById('editTimeBtn');
+  const timeHint = document.getElementById('timeHint');
+  const timezoneSelect = document.getElementById('timezone');
+  
+  if (isManualTimeMode) {
+    displayTimeInput.disabled = false;
+    editBtn.textContent = '🔄 自动';
+    editBtn.title = '切换回自动同步模式';
+    timeHint.textContent = '手动模式：时区转换已禁用';
+    timeHint.style.color = '#FF9500';
+    timezoneSelect.disabled = true;
+  } else {
+    displayTimeInput.disabled = true;
+    editBtn.textContent = '✏️ 编辑';
+    editBtn.title = '手动编辑显示时间';
+    timeHint.textContent = '自动同步平仓时间 + 时区转换';
+    timeHint.style.color = '';
+    timezoneSelect.disabled = false;
+    // 同步平仓时间到显示时间
+    syncDisplayTime();
+  }
+  saveCache();
+}
+
+// 同步平仓时间到显示时间
+function syncDisplayTime() {
+  if (isManualTimeMode) return;
+  
+  const closeTimeStr = document.getElementById('closeTime').value;
+  if (closeTimeStr) {
+    document.getElementById('displayTime').value = closeTimeStr;
+  }
 }
 
 // 获取历史价格
@@ -414,13 +473,21 @@ function getVariables() {
   const yieldValue = parseFloat(document.getElementById('yield').value);
   const entPrice = document.getElementById('entPrice').value;
   const lastPrice = document.getElementById('lastPrice').value;
-  const displayTimeStr = document.getElementById('displayTime').value;
-  const displayTime = displayTimeStr ? new Date(displayTimeStr) : new Date();
   const refcode = document.getElementById('refcode').value || '5NCXS';
-  const timezone = parseInt(document.getElementById('timezone').value) || 8;
   
-  // 将显示时间转换到目标时区
-  const convertedTime = convertToTimezone(displayTime, timezone);
+  let finalTime;
+  
+  if (isManualTimeMode) {
+    // 手动模式：直接使用显示时间，不进行时区转换
+    const displayTimeStr = document.getElementById('displayTime').value;
+    finalTime = displayTimeStr ? new Date(displayTimeStr) : new Date();
+  } else {
+    // 自动模式：使用平仓时间 + 时区转换
+    const closeTimeStr = document.getElementById('closeTime').value;
+    const closeTime = closeTimeStr ? new Date(closeTimeStr) : new Date();
+    const timezone = parseInt(document.getElementById('timezone').value) || 8;
+    finalTime = convertToTimezone(closeTime, timezone);
+  }
   
   const dirKey = action ? `${action}_${direction}` : direction;
   const directionText = currentConfig.displayTexts?.[dirKey] || direction;
@@ -433,7 +500,7 @@ function getVariables() {
     yield: yieldValue.toFixed(2) + '%',
     entprice: formatNumber(entPrice),
     lastprice: formatNumber(lastPrice),
-    date: formatDisplayDate(convertedTime, currentConfig.dateFormat || 'YYYY/MM/DD HH:mm:ss'),
+    date: formatDisplayDate(finalTime, currentConfig.dateFormat || 'YYYY/MM/DD HH:mm:ss'),
     ref: refcode,
     isProfit: yieldValue >= 0,
     directionKey: dirKey

@@ -130,7 +130,11 @@
       <!-- 显示时间 -->
       <div class="form-group">
         <label>显示时间</label>
-        <input type="datetime-local" id="displayTime">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="datetime-local" id="displayTime" style="flex:1;" disabled>
+          <button class="btn-small" id="editTimeBtn" onclick="toggleManualTime()">✏️ 编辑</button>
+        </div>
+        <div class="hint" id="timeHint">自动同步平仓时间 + 时区转换</div>
       </div>
 
       <!-- 时区设置 -->
