@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>晒单图编辑器 - 拖拽调整位置</title>
+  <link rel="stylesheet" href="fonts/harmonyos-sans.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #21262d;
+      --border-color: #30363d;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --accent-green: #3fb950;
+      --accent-red: #f85149;
+      --accent-blue: #58a6ff;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'HarmonyOS Sans SC', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    
+    .app {
+      display: grid;
+      grid-template-columns: 320px 1fr 280px;
+      height: 100vh;
+    }
+    
+    .left-panel, .right-panel {
+      background: var(--bg-secondary);
+      padding: 16px;
+      overflow-y: auto;
+    }
+    
+    .left-panel { border-right: 1px solid var(--border-color); }
+    .right-panel { border-left: 1px solid var(--border-color); }
+    
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .form-group {
+      margin-bottom: 12px;
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+    
+    .switch-row label { margin-bottom: 0; font-size: 13px; }
+    
+    .switch {
+      position: relative;
+      width: 40px;
+      height: 22px;
+    }
+    
+    .switch input { opacity: 0; width: 0; height: 0; }
+    
+    .switch .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 11px;
+      transition: 0.3s;
+    }
+    
+    .switch .slider::before {
+      position: absolute;
+      content: '';
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+    
+    .switch input:checked + .slider {
+      background: var(--accent-green);
+      border-color: var(--accent-green);
+    }
+    
+    .switch input:checked + .slider::before {
+      transform: translateX(18px);
+      background: #fff;
+    }
+    
+    .slider-row { margin-bottom: 12px; }
+    
+    .slider-row label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    
+    .slider-row input[type="range"] {
+      width: 100%;
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      -webkit-appearance: none;
+    }
+    
+    .slider-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--accent-blue);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+    
+    .btn-primary { background: var(--accent-green); color: #fff; }
+    .btn-primary:hover { background: #2ea043; }
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+    .btn-secondary:hover { background: var(--border-color); }
+    
+    .btn-small {
+      padding: 6px 10px;
+      font-size: 11px;
+      margin-top: 4px;
+    }
+    
+    /* 文件上传 */
+    .file-upload {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .file-upload input[type="file"] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+    
+    /* 画布 */
+    .canvas-panel {
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .canvas-header {
+      padding: 10px 16px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    
+    .zoom-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .zoom-control button {
+      width: 26px;
+      height: 26px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+    
+    .zoom-control button:hover { background: var(--border-color); }
+    
+    .canvas-container {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .canvas-wrapper {
+      position: relative;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+      flex-shrink: 0;
+    }
+    
+    .canvas-bg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      transition: opacity 0.2s;
+    }
+    
+    .layer-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .layer-item {
+      position: absolute;
+      cursor: move;
+      user-select: none;
+      white-space: pre;
+      text-shadow: 0 0 2px rgba(0,0,0,.8);
+    }
+    
+    .layer-item:hover {
+      outline: 2px dashed var(--accent-blue);
+      outline-offset: 2px;
+    }
+    
+    .layer-item.selected {
+      outline: 2px solid var(--accent-blue);
+      outline-offset: 2px;
+    }
+    
+    .layer-item.dragging {
+      opacity: 0.7;
+      z-index: 1000 !important;
+    }
+    
+    .layer-children {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+    }
+    
+    .layer-child {
+      white-space: pre;
+    }
+    
+    .qrcode-layer {
+      background: #fff;
+      padding: 4px;
+      border-radius: 4px;
+    }
+    
+    .layer-list { list-style: none; }
+    
+    .layer-list-item {
+      padding: 8px 10px;
+      background: var(--bg-tertiary);
+      border-radius: 6px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .layer-list-item:hover { background: var(--border-color); }
+    .layer-list-item.selected { background: var(--accent-blue); color: #fff; }
+    
+    .layer-list-item .coords {
+      color: var(--text-secondary);
+      font-family: monospace;
+      font-size: 10px;
+    }
+    
+    .layer-list-item.selected .coords { color: rgba(255,255,255,0.7); }
+    
+    .section-title {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin: 16px 0 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .json-content {
+      background: var(--bg-primary);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 9px;
+      max-height: 120px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text-secondary);
+    }
+    
+    .section-divider {
+      margin: 16px 0;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- 左侧 -->
+    <div class="left-panel">
+      <div class="panel-title">⚙️ 参数设置</div>
+      
+      <div class="form-group">
+        <label>交易所配置</label>
+        <select id="exchange" onchange="loadExchange()">
+          <option value="lbanken">LBanken</option>
+          <option value="easicoin">Easicoin</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>交易对</label>
+        <select id="tradepair" onchange="updateBackground()">
+          <option value="ETHUSDT">ETH/USDT</option>
+          <option value="BTCUSDT">BTC/USDT</option>
+        </select>
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>方向</label>
+          <select id="direction" onchange="renderLayers()">
+            <option value="long">做多</option>
+            <option value="short">做空</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>动作</label>
+          <select id="action" onchange="renderLayers()">
+            <option value="close">平仓</option>
+            <option value="open">开仓</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>杠杆</label>
+        <input type="number" id="leverage" value="50" onchange="renderLayers()">
+      </div>
+      
+      <div class="form-group">
+        <label>收益率 (%)</label>
+        <input type="number" id="yield" value="128.56" step="0.01" onchange="renderLayers()">
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>开仓价</label>
+          <input type="number" id="entPrice" value="3245.67" step="0.01" onchange="renderLayers()">
+        </div>
+        <div class="form-group">
+          <label>当前价</label>
+          <input type="number" id="lastPrice" value="3890.12" step="0.01" onchange="renderLayers()">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>时间</label>
+        <input type="datetime-local" id="displayTime" onchange="renderLayers()">
+      </div>
+      
+      <div class="form-group">
+        <label>邀请码</label>
+        <input type="text" id="refcode" value="5NCXS" onchange="renderLayers()">
+      </div>
+      
+      <!-- 垫图设置 -->
+      <div class="section-divider">
+        <div class="form-group">
+          <label>🖼️ 自定义底图</label>
+          <div class="file-upload">
+            <button class="btn btn-secondary btn-small">选择图片文件...</button>
+            <input type="file" id="customBgFile" accept="image/*" onchange="loadCustomBackground(event)">
+          </div>
+          <div style="margin-top:6px;font-size:11px;color:var(--text-secondary);" id="customBgName">未选择</div>
+        </div>
+        
+        <div class="switch-row">
+          <label>显示背景图</label>
+          <label class="switch">
+            <input type="checkbox" id="showBg" checked onchange="toggleBackground()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        
+        <div class="slider-row">
+          <label>
+            <span>背景透明度</span>
+            <span id="opacityValue">100%</span>
+          </label>
+          <input type="range" id="bgOpacity" min="0" max="100" value="100" oninput="updateOpacity()">
+        </div>
+      </div>
+      
+      <!-- 字体设置 -->
+      <div class="section-divider">
+        <div class="form-group">
+          <label>🔤 全局字体</label>
+          <select id="globalFont" onchange="changeGlobalFont()">
+            <option value="HarmonyOS Sans SC">HarmonyOS Sans SC</option>
+            <option value="Noto Sans SC">Noto Sans SC</option>
+            <option value="Inter">Inter</option>
+            <option value="Arial">Arial</option>
+            <option value="Microsoft YaHei">微软雅黑</option>
+          </select>
+        </div>
+      </div>
+      
+      <button class="btn btn-primary" onclick="exportJSON()">📋 导出 JSON</button>
+      <button class="btn btn-secondary" onclick="generateImage()">🖼️ 生成图片</button>
+      <button class="btn btn-secondary" onclick="importJSON()">📂 导入 JSON</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
+    </div>
+    
+    <!-- 中间画布 -->
+    <div class="canvas-panel">
+      <div class="canvas-header">
+        <span>📐 <span id="canvasSize">750 × 1240</span></span>
+        <div class="zoom-control">
+          <button onclick="zoom(-0.1)">−</button>
+          <span id="zoomValue" style="min-width:40px;text-align:center;">50%</span>
+          <button onclick="zoom(0.1)">+</button>
+          <button onclick="resetZoom()">⟲</button>
+        </div>
+      </div>
+      <div class="canvas-container" id="canvasContainer">
+        <div class="canvas-wrapper" id="canvasWrapper">
+          <img class="canvas-bg" id="canvasBg" src="">
+          <div class="layer-overlay" id="layerOverlay"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 右侧 -->
+    <div class="right-panel">
+      <div class="panel-title">📑 图层列表</div>
+      <ul class="layer-list" id="layerList"></ul>
+      
+      <div class="section-title">📍 选中图层</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>X</label>
+          <input type="number" id="propX" onchange="updateSelectedPosition()">
+        </div>
+        <div class="form-group">
+          <label>Y</label>
+          <input type="number" id="propY" onchange="updateSelectedPosition()">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>字号</label>
+          <input type="number" id="propFontSize" onchange="updateSelectedStyle()">
+        </div>
+        <div class="form-group">
+          <label>字重</label>
+          <select id="propFontWeight" onchange="updateSelectedStyle()">
+            <option value="100">Thin</option>
+            <option value="400">Regular</option>
+            <option value="500">Medium</option>
+            <option value="600">SemiBold</option>
+            <option value="700">Bold</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>颜色</label>
+        <input type="color" id="propColor" onchange="updateSelectedStyle()" style="width:100%;height:32px;">
+      </div>
+      
+      <div class="section-title">📄 配置预览</div>
+      <div class="json-content" id="jsonPreview"></div>
+    </div>
+  </div>
+  
+  <script src="js/html2canvas.min.js"></script>
+  <script src="js/qrcode.min.js"></script>
+  <script src="js/backgrounds.js"></script>
+  <script>
+    // 完整配置（从原始 model.json 复制）
+    const configs = {
+      lbanken: {
+        width: 750, height: 1240,
+        dateFormat: 'YYYY/MM/DD HH:mm:ss',
+        displayTexts: {
+          long: 'Long', short: 'Short',
+          open_long: 'Open Long', open_short: 'Open Short',
+          close_long: 'Close Long', close_short: 'Close Short'
+        },
+        profitColor: '#279E55', lossColor: '#FF6B6B',
+        dynamicColors: {
+          open_long: '#279E55', open_short: '#FF6B6B',
+          close_long: '#FF6B6B', close_short: '#279E55'
+        },
+        layers: [
+          {
+            id: 'L8x8ikdz', type: 'text', x: 52, y: 231,
+            fontFamily: 'HarmonyOS Sans SC', fontSize: 14, color: '#ffffff', fontWeight: 400,
+            letterSpacing: 0, lineHeight: 1.2,
+            children: [
+              { text: '{{tradepair}} Perp', fontSize: 26, fontWeight: 400 },
+              { text: '|', gap: 21, color: '#36393F', fontSize: 27, fontWeight: 100 },
+              { text: '{{direction}}', gap: 21, fontSize: 26, fontWeight: 400, dynamicColor: true },
+              { text: '|', gap: 23, color: '#36393F', fontSize: 27, fontWeight: 100 },
+              { text: '{{lev}}x', gap: 22, fontSize: 26, fontWeight: 400 }
+            ]
+          },
+          {
+            id: 'Lpxqskdf', type: 'text', x: 479, y: 67, text: '{{date}}',
+            fontFamily: 'HarmonyOS Sans SC', fontSize: 22, color: '#90959E', fontWeight: 400,
+            letterSpacing: 0.4, lineHeight: 1.2
+          },
+          {
+            id: 'Lpk1mp1y', type: 'text', x: 52, y: 363, text: '+{{yield}}',
+            fontFamily: 'HarmonyOS Sans SC', fontSize: 64, color: '#279E55', fontWeight: 700,
+            letterSpacing: 0, lineHeight: 1.2, profitLossColor: true
+          },
+          {
+            id: 'Lbddqvll', type: 'text', x: 53, y: 513, text: '{{entprice}}',
+            fontFamily: 'HarmonyOS Sans SC', fontSize: 25, color: '#ffffff', fontWeight: 400,
+            letterSpacing: 0.7, lineHeight: 1.2
+          },
+          {
+            id: 'L0l7ylfu', type: 'text', x: 53, y: 617, text: '{{lastprice}}',
+            fontFamily: 'HarmonyOS Sans SC', fontSize: 25, color: '#ffffff', fontWeight: 400,
+            letterSpacing: 0.7, lineHeight: 1.2
+          },
+          {
+            id: 'Lqrcode1', type: 'qrcode', x: 608, y: 1083, width: 114, height: 114
+          },
+          {
+            id: 'Lx3l0xzm', type: 'text', x: 41, y: 1099, text: 'Referral Code {{ref}}',
+            fontFamily: 'HarmonyOS Sans SC', fontSize: 31, color: '#ffffff', fontWeight: 400,
+            letterSpacing: 0.6, lineHeight: 1.2
+          },
+          {
+            id: 'Lm0ffrx6', type: 'text', x: 40, y: 1152, text: 'Sign Up to Take Your Cut of $2M',
+            fontFamily: 'HarmonyOS Sans SC', fontSize: 28, color: '#9095A0', fontWeight: 400,
+            letterSpacing: 0, lineHeight: 1.2
+          }
+        ]
+      },
+      easicoin: {
+        width: 908, height: 1280,
+        dateFormat: 'YYYY-MM-DD HH:mm',
+        displayTexts: {
+          long: '做多', short: '做空',
+          open_long: '开多', open_short: '开空',
+          close_long: '平多', close_short: '平空'
+        },
+        profitColor: '#21C07C', lossColor: '#F6465D',
+        dynamicColors: {
+          open_long: '#21C07C', open_short: '#F6465D',
+          close_long: '#F6465D', close_short: '#21C07C'
+        },
+        layers: [
+          { id: 'tradepair', type: 'text', x: 40, y: 180, text: '{{tradepair}}', fontSize: 32, fontWeight: 700, color: '#FFFFFF', fontFamily: 'Noto Sans SC' },
+          { id: 'direction', type: 'text', x: 40, y: 230, text: '{{direction}} {{lev}}x', fontSize: 24, fontWeight: 500, dynamicColor: true, fontFamily: 'Noto Sans SC' },
+          { id: 'yield', type: 'text', x: 40, y: 320, text: '{{yield}}', fontSize: 64, fontWeight: 700, profitLossColor: true, fontFamily: 'Noto Sans SC' },
+          { id: 'entPrice', type: 'text', x: 200, y: 500, text: '{{entprice}}', fontSize: 22, fontWeight: 400, color: '#FFFFFF', fontFamily: 'Noto Sans SC' },
+          { id: 'lastPrice', type: 'text', x: 550, y: 500, text: '{{lastprice}}', fontSize: 22, fontWeight: 400, color: '#FFFFFF', fontFamily: 'Noto Sans SC' },
+          { id: 'date', type: 'text', x: 40, y: 1220, text: '{{date}}', fontSize: 18, fontWeight: 400, color: 'rgba(255,255,255,0.6)', fontFamily: 'Noto Sans SC' },
+          { id: 'qrcode', type: 'qrcode', x: 750, y: 1120, width: 120, height: 120 }
+        ]
+      }
+    };
+    
+    let currentConfig = null;
+    let currentLayers = [];
+    let selectedLayerId = null;
+    let scale = 0.5;
+    let isDragging = false;
+    let dragStartX = 0, dragStartY = 0;
+    let dragLayerStartX = 0, dragLayerStartY = 0;
+    let dragTarget = null;
+    let customBgDataUrl = null;
+    let globalFont = 'HarmonyOS Sans SC';
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('displayTime').value = formatDateTimeLocal(new Date());
+      loadExchange();
+      document.addEventListener('keydown', handleKeydown);
+    });
+    
+    function formatDateTimeLocal(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      const h = String(date.getHours()).padStart(2, '0');
+      const min = String(date.getMinutes()).padStart(2, '0');
+      return `${y}-${m}-${d}T${h}:${min}`;
+    }
+    
+    function formatDisplayDate(date, format) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      const h = String(date.getHours()).padStart(2, '0');
+      const min = String(date.getMinutes()).padStart(2, '0');
+      const sec = String(date.getSeconds()).padStart(2, '0');
+      return format.replace('YYYY', y).replace('MM', m).replace('DD', d)
+        .replace('HH', h).replace('mm', min).replace('ss', sec);
+    }
+    
+    function formatNumber(num) {
+      const n = parseFloat(num);
+      if (n >= 100) return n.toFixed(2);
+      if (n >= 10) return n.toFixed(3);
+      return n.toFixed(4);
+    }
+    
+    function loadExchange() {
+      const exchange = document.getElementById('exchange').value;
+      currentConfig = JSON.parse(JSON.stringify(configs[exchange]));
+      currentLayers = currentConfig.layers;
+      
+      document.getElementById('canvasSize').textContent = `${currentConfig.width} × ${currentConfig.height}`;
+      
+      const wrapper = document.getElementById('canvasWrapper');
+      wrapper.style.width = currentConfig.width + 'px';
+      wrapper.style.height = currentConfig.height + 'px';
+      
+      customBgDataUrl = null;
+      document.getElementById('customBgName').textContent = '未选择';
+      
+      applyZoom();
+      updateBackground();
+      renderLayers();
+      updateLayerList();
+      updateJSONPreview();
+    }
+    
+    function updateBackground() {
+      const exchange = document.getElementById('exchange').value;
+      const tradepair = document.getElementById('tradepair').value;
+      const bg = document.getElementById('canvasBg');
+      
+      if (customBgDataUrl) {
+        bg.src = customBgDataUrl;
+      } else if (typeof BACKGROUNDS !== 'undefined' && BACKGROUNDS[exchange]) {
+        bg.src = BACKGROUNDS[exchange][tradepair] || BACKGROUNDS[exchange].ETHUSDT;
+      }
+      renderLayers();
+    }
+    
+    // 加载自定义底图
+    function loadCustomBackground(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        customBgDataUrl = evt.target.result;
+        document.getElementById('canvasBg').src = customBgDataUrl;
+        document.getElementById('customBgName').textContent = file.name;
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    // 更换全局字体
+    function changeGlobalFont() {
+      globalFont = document.getElementById('globalFont').value;
+      renderLayers();
+    }
+    
+    function toggleBackground() {
+      const show = document.getElementById('showBg').checked;
+      document.getElementById('canvasBg').style.visibility = show ? 'visible' : 'hidden';
+    }
+    
+    function updateOpacity() {
+      const opacity = document.getElementById('bgOpacity').value;
+      document.getElementById('opacityValue').textContent = opacity + '%';
+      document.getElementById('canvasBg').style.opacity = opacity / 100;
+    }
+    
+    function getVariables() {
+      const exchange = document.getElementById('exchange').value;
+      const tradepair = document.getElementById('tradepair').value;
+      const direction = document.getElementById('direction').value;
+      const action = document.getElementById('action').value;
+      const leverage = document.getElementById('leverage').value;
+      const yieldValue = parseFloat(document.getElementById('yield').value);
+      const entPrice = document.getElementById('entPrice').value;
+      const lastPrice = document.getElementById('lastPrice').value;
+      const displayTimeStr = document.getElementById('displayTime').value;
+      const displayTime = displayTimeStr ? new Date(displayTimeStr) : new Date();
+      const refcode = document.getElementById('refcode').value || '5NCXS';
+      
+      const config = configs[exchange];
+      const dirKey = action ? `${action}_${direction}` : direction;
+      
+      return {
+        tradepair: tradepair.replace('USDT', '/USDT'),
+        direction: config.displayTexts[dirKey] || direction,
+        lev: leverage,
+        yield: yieldValue.toFixed(2) + '%',  // 不加符号，由模板决定
+        entprice: formatNumber(entPrice),
+        lastprice: formatNumber(lastPrice),
+        date: formatDisplayDate(displayTime, config.dateFormat),
+        ref: refcode,
+        isProfit: yieldValue >= 0,
+        directionKey: dirKey
+      };
+    }
+    
+    function replaceVars(text, vars) {
+      return text.replace(/\{\{(\w+)\}\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m);
+    }
+    
+    function renderLayers() {
+      const overlay = document.getElementById('layerOverlay');
+      overlay.innerHTML = '';
+      
+      const vars = getVariables();
+      const exchange = document.getElementById('exchange').value;
+      const config = configs[exchange];
+      
+      currentLayers.forEach((layer, index) => {
+        const div = document.createElement('div');
+        div.className = 'layer-item' + (selectedLayerId === layer.id ? ' selected' : '');
+        div.dataset.id = layer.id;
+        div.dataset.index = index;
+        div.style.left = layer.x + 'px';
+        div.style.top = layer.y + 'px';
+        div.style.fontFamily = layer.fontFamily || globalFont;
+        
+        if (layer.type === 'text' || !layer.type) {
+          if (layer.children) {
+            div.classList.add('layer-children');
+            layer.children.forEach(child => {
+              const span = document.createElement('span');
+              span.className = 'layer-child';
+              span.textContent = replaceVars(child.text, vars);
+              span.style.fontSize = (child.fontSize || layer.fontSize || 14) + 'px';
+              span.style.fontWeight = child.fontWeight || layer.fontWeight || 400;
+              span.style.fontFamily = child.fontFamily || layer.fontFamily || globalFont;
+              
+              if (child.gap) span.style.marginLeft = child.gap + 'px';
+              if (child.letterSpacing) span.style.letterSpacing = child.letterSpacing + 'px';
+              
+              if (child.dynamicColor) {
+                span.style.color = config.dynamicColors[vars.directionKey] || '#FFFFFF';
+              } else {
+                span.style.color = child.color || layer.color || '#FFFFFF';
+              }
+              
+              div.appendChild(span);
+            });
+          } else {
+            let text = replaceVars(layer.text || '', vars);
+            div.textContent = text;
+            div.style.fontSize = (layer.fontSize || 14) + 'px';
+            div.style.fontWeight = layer.fontWeight || 400;
+            if (layer.letterSpacing) div.style.letterSpacing = layer.letterSpacing + 'px';
+            if (layer.lineHeight) div.style.lineHeight = layer.lineHeight;
+            
+            if (layer.profitLossColor) {
+              div.style.color = vars.isProfit ? config.profitColor : config.lossColor;
+            } else if (layer.dynamicColor) {
+              div.style.color = config.dynamicColors[vars.directionKey] || '#FFFFFF';
+            } else {
+              div.style.color = layer.color || '#FFFFFF';
+            }
+          }
+        } else if (layer.type === 'qrcode') {
+          div.classList.add('qrcode-layer');
+          div.style.width = layer.width + 'px';
+          div.style.height = layer.height + 'px';
+          
+          new QRCode(div, {
+            text: 'https://lbank.com/ref/' + vars.ref,
+            width: layer.width - 8,
+            height: layer.height - 8,
+            colorDark: '#000000',
+            colorLight: '#ffffff'
+          });
+        }
+        
+        div.addEventListener('mousedown', startDrag);
+        overlay.appendChild(div);
+      });
+    }
+    
+    function updateLayerList() {
+      const list = document.getElementById('layerList');
+      list.innerHTML = '';
+      
+      currentLayers.forEach(layer => {
+        const li = document.createElement('li');
+        li.className = 'layer-list-item' + (selectedLayerId === layer.id ? ' selected' : '');
+        li.innerHTML = `<span>${layer.id}</span><span class="coords">(${layer.x}, ${layer.y})</span>`;
+        li.onclick = () => selectLayer(layer.id);
+        list.appendChild(li);
+      });
+    }
+    
+    function selectLayer(id) {
+      selectedLayerId = id;
+      const layer = currentLayers.find(l => l.id === id);
+      
+      if (layer) {
+        document.getElementById('propX').value = layer.x;
+        document.getElementById('propY').value = layer.y;
+        document.getElementById('propFontSize').value = layer.fontSize || '';
+        document.getElementById('propFontWeight').value = layer.fontWeight || '400';
+        document.getElementById('propColor').value = layer.color?.startsWith('#') ? layer.color : '#ffffff';
+      }
+      
+      document.querySelectorAll('.layer-item').forEach(el => {
+        el.classList.toggle('selected', el.dataset.id === id);
+      });
+      document.querySelectorAll('.layer-list-item').forEach((el, i) => {
+        el.classList.toggle('selected', currentLayers[i]?.id === id);
+      });
+    }
+    
+    function updateSelectedPosition() {
+      if (!selectedLayerId) return;
+      const layer = currentLayers.find(l => l.id === selectedLayerId);
+      if (layer) {
+        layer.x = parseInt(document.getElementById('propX').value) || 0;
+        layer.y = parseInt(document.getElementById('propY').value) || 0;
+        renderLayers();
+        updateLayerList();
+        updateJSONPreview();
+      }
+    }
+    
+    function updateSelectedStyle() {
+      if (!selectedLayerId) return;
+      const layer = currentLayers.find(l => l.id === selectedLayerId);
+      if (layer) {
+        const fontSize = parseInt(document.getElementById('propFontSize').value);
+        const fontWeight = parseInt(document.getElementById('propFontWeight').value);
+        const color = document.getElementById('propColor').value;
+        if (fontSize) layer.fontSize = fontSize;
+        if (fontWeight) layer.fontWeight = fontWeight;
+        if (color) layer.color = color;
+        renderLayers();
+        updateJSONPreview();
+      }
+    }
+    
+    function startDrag(e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      
+      dragTarget = e.currentTarget;
+      selectLayer(dragTarget.dataset.id);
+      
+      const layer = currentLayers.find(l => l.id === dragTarget.dataset.id);
+      if (!layer) return;
+      
+      isDragging = true;
+      dragTarget.classList.add('dragging');
+      
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      dragLayerStartX = layer.x;
+      dragLayerStartY = layer.y;
+      
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', stopDrag);
+    }
+    
+    function onDrag(e) {
+      if (!isDragging || !dragTarget) return;
+      
+      const layer = currentLayers.find(l => l.id === dragTarget.dataset.id);
+      if (!layer) return;
+      
+      const dx = (e.clientX - dragStartX) / scale;
+      const dy = (e.clientY - dragStartY) / scale;
+      
+      layer.x = Math.max(0, Math.round(dragLayerStartX + dx));
+      layer.y = Math.max(0, Math.round(dragLayerStartY + dy));
+      
+      dragTarget.style.left = layer.x + 'px';
+      dragTarget.style.top = layer.y + 'px';
+      
+      document.getElementById('propX').value = layer.x;
+      document.getElementById('propY').value = layer.y;
+      
+      updateLayerList();
+    }
+    
+    function stopDrag() {
+      if (dragTarget) dragTarget.classList.remove('dragging');
+      isDragging = false;
+      dragTarget = null;
+      document.removeEventListener('mousemove', onDrag);
+      document.removeEventListener('mouseup', stopDrag);
+      updateJSONPreview();
+    }
+    
+    function handleKeydown(e) {
+      if (!selectedLayerId) return;
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      
+      const layer = currentLayers.find(l => l.id === selectedLayerId);
+      if (!layer) return;
+      
+      const step = e.shiftKey ? 10 : 1;
+      let changed = false;
+      
+      switch (e.key) {
+        case 'ArrowUp': layer.y -= step; changed = true; break;
+        case 'ArrowDown': layer.y += step; changed = true; break;
+        case 'ArrowLeft': layer.x -= step; changed = true; break;
+        case 'ArrowRight': layer.x += step; changed = true; break;
+      }
+      
+      if (changed) {
+        e.preventDefault();
+        layer.x = Math.max(0, layer.x);
+        layer.y = Math.max(0, layer.y);
+        document.getElementById('propX').value = layer.x;
+        document.getElementById('propY').value = layer.y;
+        renderLayers();
+        updateLayerList();
+        updateJSONPreview();
+      }
+    }
+    
+    function zoom(delta) {
+      scale = Math.max(0.2, Math.min(1.5, scale + delta));
+      applyZoom();
+    }
+    
+    function resetZoom() {
+      scale = 0.5;
+      applyZoom();
+    }
+    
+    function applyZoom() {
+      document.getElementById('zoomValue').textContent = Math.round(scale * 100) + '%';
+      const wrapper = document.getElementById('canvasWrapper');
+      wrapper.style.transform = `scale(${scale})`;
+      wrapper.style.transformOrigin = 'top center';
+    }
+    
+    function updateJSONPreview() {
+      const json = JSON.stringify({ layers: currentLayers }, null, 2);
+      document.getElementById('jsonPreview').textContent = json.substring(0, 800) + (json.length > 800 ? '\n...' : '');
+    }
+    
+    function exportJSON() {
+      const exchange = document.getElementById('exchange').value;
+      const data = {
+        width: currentConfig.width,
+        height: currentConfig.height,
+        customFontUrls: [],
+        layers: currentLayers
+      };
+      
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${exchange}-model.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    function importJSON() {
+      document.getElementById('importFile').click();
+    }
+    
+    function handleImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = JSON.parse(evt.target.result);
+          if (data.layers) {
+            currentLayers = data.layers;
+            if (data.width) currentConfig.width = data.width;
+            if (data.height) currentConfig.height = data.height;
+            
+            document.getElementById('canvasSize').textContent = `${currentConfig.width} × ${currentConfig.height}`;
+            const wrapper = document.getElementById('canvasWrapper');
+            wrapper.style.width = currentConfig.width + 'px';
+            wrapper.style.height = currentConfig.height + 'px';
+            
+            renderLayers();
+            updateLayerList();
+            updateJSONPreview();
+            alert('导入成功！');
+          }
+        } catch (err) {
+          alert('导入失败: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+    
+    async function generateImage() {
+      const wrapper = document.getElementById('canvasWrapper');
+      const originalTransform = wrapper.style.transform;
+      wrapper.style.transform = '';
+      
+      const bg = document.getElementById('canvasBg');
+      const originalOpacity = bg.style.opacity;
+      const originalVisibility = bg.style.visibility;
+      bg.style.opacity = '1';
+      bg.style.visibility = 'visible';
+      
+      try {
+        const canvas = await html2canvas(wrapper, {
+          width: currentConfig.width,
+          height: currentConfig.height,
+          scale: 1,
+          useCORS: true
+        });
+        
+        const dataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `profit-${Date.now()}.png`;
+        a.click();
+      } catch (err) {
+        alert('生成失败: ' + err.message);
+      } finally {
+        wrapper.style.transform = originalTransform;
+        bg.style.opacity = originalOpacity;
+        bg.style.visibility = originalVisibility;
+      }
+    }
+  </script>
+</body>
+</html>

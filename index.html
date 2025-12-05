@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>晒单图生成器 - 静态版</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="fonts/harmonyos-sans.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <!-- 左侧控制面板 -->
+    <div class="control-panel">
+      <div class="panel-header">
+        <h1>📊 晒单图生成器</h1>
+        <span class="badge">静态版 v2.2</span>
+      </div>
+
+      <!-- 配置导入 -->
+      <div class="form-group">
+        <label>📂 配置模板</label>
+        <div style="display:flex;gap:8px;">
+          <select id="configSelect" style="flex:1;" onchange="loadConfigSelect()">
+            <option value="lbanken">LBanken (内置)</option>
+            <option value="custom">自定义配置...</option>
+          </select>
+          <button class="btn-small" onclick="document.getElementById('configFile').click()">导入</button>
+        </div>
+        <input type="file" id="configFile" accept=".json" style="display:none" onchange="importConfig(event)">
+        <div class="hint" id="configName">使用内置 LBanken 配置</div>
+      </div>
+
+      <!-- 交易对输入 -->
+      <div class="form-group">
+        <label>📈 交易对</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="tradepair" value="ETHUSDT" placeholder="输入交易对，如 BTCUSDT" style="flex:1;" list="tradepairList">
+          <datalist id="tradepairList">
+            <option value="BTCUSDT">
+            <option value="ETHUSDT">
+            <option value="SOLUSDT">
+            <option value="BNBUSDT">
+            <option value="XRPUSDT">
+            <option value="DOGEUSDT">
+          </datalist>
+        </div>
+      </div>
+
+      <!-- 底图 -->
+      <div class="form-group">
+        <label>🖼️ 底图</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span id="bgStatus" style="flex:1;font-size:12px;color:var(--text-secondary);">使用默认底图</span>
+          <button class="btn-small" onclick="document.getElementById('bgFile').click()">更换底图</button>
+          <button class="btn-small" onclick="resetBackground()" title="重置">↺</button>
+        </div>
+        <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="loadCustomBg(event)">
+      </div>
+
+      <!-- 方向 -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>方向</label>
+          <select id="direction">
+            <option value="long">做多</option>
+            <option value="short">做空</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>动作</label>
+          <select id="action">
+            <option value="close">平仓</option>
+            <option value="open">开仓</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 杠杆 -->
+      <div class="form-group">
+        <label>杠杆倍数</label>
+        <input type="number" id="leverage" value="50" min="1" max="500">
+      </div>
+
+      <!-- 收益率 -->
+      <div class="form-group">
+        <label>收益率 (%)</label>
+        <input type="number" id="yield" value="128.56" step="0.01">
+        <div class="hint">正数为盈利（绿色），负数为亏损（红色）</div>
+      </div>
+
+      <!-- 自动计算价格开关 -->
+      <div class="form-group switch-group">
+        <label>🔄 自动计算价格</label>
+        <label class="switch">
+          <input type="checkbox" id="autoCalcPrice" onchange="toggleAutoCalc()">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- 手动输入价格 -->
+      <div id="manualPriceSection">
+        <div class="form-row">
+          <div class="form-group">
+            <label>开仓价格</label>
+            <input type="number" id="entPrice" value="3245.67" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>当前价格</label>
+            <input type="number" id="lastPrice" value="3890.12" step="0.01">
+          </div>
+        </div>
+      </div>
+
+      <!-- 自动计算价格（时间输入） -->
+      <div id="autoCalcSection" style="display:none;">
+        <div class="form-group">
+          <label>开仓时间</label>
+          <input type="datetime-local" id="entTime">
+        </div>
+        <div class="form-group">
+          <label>平仓时间</label>
+          <input type="datetime-local" id="closeTime">
+        </div>
+        <button class="btn-calc" onclick="fetchPrices()">
+          <span>📡</span> 获取历史价格
+        </button>
+        <div class="hint" id="priceHint" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- 显示时间 -->
+      <div class="form-group">
+        <label>显示时间</label>
+        <input type="datetime-local" id="displayTime">
+      </div>
+
+      <!-- 邀请码 -->
+      <div class="form-group">
+        <label>邀请码</label>
+        <input type="text" id="refcode" value="5NCXS" placeholder="输入邀请码">
+      </div>
+
+      <!-- 按钮 -->
+      <button class="btn-generate" id="generateBtn" onclick="generateImage()">
+        <span>⚡</span> 生成晒单图
+      </button>
+
+      <button class="btn-download" id="downloadBtn" style="display:none;" onclick="downloadImage()">
+        <span>⬇️</span> 下载图片
+      </button>
+
+      <!-- 快捷操作 -->
+      <div class="quick-actions">
+        <div class="quick-title">⚡ 快捷操作</div>
+        <div class="quick-btns">
+          <button onclick="fillRandom()">随机数据</button>
+          <button onclick="fillProfit()">盈利示例</button>
+          <button onclick="fillLoss()">亏损示例</button>
+          <button onclick="clearCache()" style="color:#FF6B6B;">清除缓存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧预览区 -->
+    <div class="preview-panel">
+      <div class="preview-header">
+        <span>📱 图片预览</span>
+        <span id="previewSize">750 × 1240</span>
+      </div>
+      <div class="preview-container">
+        <div id="previewArea" class="preview-placeholder">
+          <div class="placeholder-content">
+            <div class="placeholder-icon">🖼️</div>
+            <p>填写参数后点击「生成晒单图」</p>
+            <p style="font-size:12px;margin-top:8px;opacity:0.7;">配置自动保存，刷新后可恢复</p>
+          </div>
+        </div>
+        <div id="renderContainer" style="position: absolute; left: -9999px; top: 0;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/html2canvas.min.js"></script>
+  <script src="js/qrcode.min.js"></script>
+  <script src="js/backgrounds.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
