@@ -137,7 +137,8 @@ function saveCache() {
     entTime: document.getElementById('entTime').value,
     closeTime: document.getElementById('closeTime').value,
     configSelect: document.getElementById('configSelect').value,
-    customBgDataUrl: customBgDataUrl
+    customBgDataUrl: customBgDataUrl,
+    timezone: document.getElementById('timezone').value
   };
   
   localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
@@ -174,6 +175,10 @@ function loadCache() {
       customBgDataUrl = cache.customBgDataUrl;
       document.getElementById('bgStatus').textContent = '✅ 使用自定义底图';
       document.getElementById('bgStatus').style.color = '#279E55';
+    }
+    
+    if (cache.timezone) {
+      document.getElementById('timezone').value = cache.timezone;
     }
     
     console.log('配置已从缓存恢复');
@@ -385,6 +390,21 @@ function formatNumber(num) {
   return n.toFixed(4);
 }
 
+// 将时间转换到目标时区
+function convertToTimezone(date, targetTimezoneOffset) {
+  // 获取本地时区偏移（分钟），注意 getTimezoneOffset 返回的是 UTC - 本地时间，所以需要取反
+  const localOffset = -date.getTimezoneOffset(); // 本地时区偏移（分钟）
+  const targetOffset = targetTimezoneOffset * 60; // 目标时区偏移（分钟）
+  
+  // 计算差值（分钟）
+  const diff = targetOffset - localOffset;
+  
+  // 创建新的日期对象，调整时间
+  const convertedDate = new Date(date.getTime() + diff * 60 * 1000);
+  
+  return convertedDate;
+}
+
 // 获取变量
 function getVariables() {
   const tradepair = document.getElementById('tradepair').value.toUpperCase();
@@ -397,6 +417,10 @@ function getVariables() {
   const displayTimeStr = document.getElementById('displayTime').value;
   const displayTime = displayTimeStr ? new Date(displayTimeStr) : new Date();
   const refcode = document.getElementById('refcode').value || '5NCXS';
+  const timezone = parseInt(document.getElementById('timezone').value) || 8;
+  
+  // 将显示时间转换到目标时区
+  const convertedTime = convertToTimezone(displayTime, timezone);
   
   const dirKey = action ? `${action}_${direction}` : direction;
   const directionText = currentConfig.displayTexts?.[dirKey] || direction;
@@ -409,7 +433,7 @@ function getVariables() {
     yield: yieldValue.toFixed(2) + '%',
     entprice: formatNumber(entPrice),
     lastprice: formatNumber(lastPrice),
-    date: formatDisplayDate(displayTime, currentConfig.dateFormat || 'YYYY/MM/DD HH:mm:ss'),
+    date: formatDisplayDate(convertedTime, currentConfig.dateFormat || 'YYYY/MM/DD HH:mm:ss'),
     ref: refcode,
     isProfit: yieldValue >= 0,
     directionKey: dirKey
