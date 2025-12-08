@@ -1,5 +1,4 @@
 {
-  "name": "LBanken",
   "width": 1050,
   "height": 1696,
   "dateFormat": "YYYY-MM-DD HH:mm:ss",
@@ -23,12 +22,13 @@
     "baseUrl": "https://lbank.com/ref/",
     "defaultRefCode": "5NCXS"
   },
+  "customFontUrls": [],
   "layers": [
     {
       "id": "L8x8ikdz",
       "type": "text",
       "x": 42,
-      "y": 285,
+      "y": 279,
       "fontFamily": "HarmonyOS Sans SC",
       "fontSize": 20,
       "color": "#ffffff",
@@ -36,11 +36,39 @@
       "letterSpacing": 0,
       "lineHeight": 1.2,
       "children": [
-        { "text": "{{tradepair}} Perp", "fontSize": 36, "fontWeight": 400 },
-        { "text": "|", "gap": 29, "color": "#36393F", "fontSize": 38, "fontWeight": 100 },
-        { "text": "{{direction}}", "gap": 29, "fontSize": 36, "fontWeight": 400, "dynamicColor": true },
-        { "text": "|", "gap": 32, "color": "#36393F", "fontSize": 38, "fontWeight": 100 },
-        { "text": "{{lev}}x", "gap": 31, "fontSize": 36, "fontWeight": 400, "color": "#90959E" }
+        {
+          "text": "{{tradepair}} Perp",
+          "fontSize": 36,
+          "fontWeight": 400
+        },
+        {
+          "text": "|",
+          "gap": 29,
+          "color": "#36393F",
+          "fontSize": 38,
+          "fontWeight": 100
+        },
+        {
+          "text": "{{direction}}",
+          "gap": 29,
+          "fontSize": 36,
+          "fontWeight": 400,
+          "dynamicColor": true
+        },
+        {
+          "text": "|",
+          "gap": 32,
+          "color": "#36393F",
+          "fontSize": 38,
+          "fontWeight": 100
+        },
+        {
+          "text": "{{lev}}x",
+          "gap": 31,
+          "fontSize": 36,
+          "fontWeight": 400,
+          "color": "#90959E"
+        }
       ]
     },
     {
@@ -52,7 +80,7 @@
       "fontFamily": "HarmonyOS Sans SC",
       "fontSize": 31,
       "color": "#90959E",
-      "fontWeight": 400,
+      "fontWeight": 300,
       "letterSpacing": -0.14,
       "lineHeight": 1.2
     },
@@ -63,7 +91,7 @@
       "y": 421,
       "text": "+{{yield}}",
       "fontFamily": "HarmonyOS Sans SC",
-      "fontSize": 53,
+      "fontSize": 50,
       "fontWeight": 700,
       "letterSpacing": 0,
       "lineHeight": 1.2,
@@ -98,10 +126,10 @@
     {
       "id": "Lqrcode1",
       "type": "qrcode",
-      "x": 869,
-      "y": 1487,
-      "width": 160,
-      "height": 160
+      "x": 876,
+      "y": 1504,
+      "width": 144,
+      "height": 144
     },
     {
       "id": "Lx3l0xzm",
@@ -119,14 +147,14 @@
     {
       "id": "Lm0ffrx6",
       "type": "text",
-      "x": 48,
-      "y": 1588,
-      "text": "Sign Up to Take Your Cut of $2M",
+      "x": 49,
+      "y": 1590,
+      "text": "Scan to join and claim 50,000 USDT！",
       "fontFamily": "HarmonyOS Sans SC",
-      "fontSize": 35,
+      "fontSize": 32,
       "color": "#9095A0",
-      "fontWeight": 400,
-      "letterSpacing": 0,
+      "fontWeight": 300,
+      "letterSpacing": 0.7,
       "lineHeight": 1.2
     }
   ]

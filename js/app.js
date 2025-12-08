@@ -500,13 +500,40 @@ function loadPositionCache() {
   }
 }
 
-function resetLayerPositions() {
+async function resetLayerPositions() {
   if (!confirm('确定重置所有图层到默认值？')) return;
   
-  // 重新加载默认配置
-  currentConfig = JSON.parse(JSON.stringify(lbankenConfig));
+  // 清除位置缓存
   localStorage.removeItem(POSITION_CACHE_KEY);
   positionModified = false;
+  
+  // 重新从配置文件加载（不使用缓存）
+  const selectedConfig = document.getElementById('configSelect').value;
+  const cfgInfo = configList.find(c => c.id === selectedConfig);
+  
+  if (cfgInfo && cfgInfo.file) {
+    try {
+      const response = await fetch(`config/${cfgInfo.file}`);
+      const data = await response.json();
+      currentConfig = {
+        name: data.name || cfgInfo.name,
+        width: data.width || 1050,
+        height: data.height || 1696,
+        dateFormat: data.dateFormat || 'YYYY-MM-DD HH:mm:ss',
+        displayTexts: data.displayTexts || {},
+        dynamicColors: data.dynamicColors || {},
+        profitColor: data.profitColor || '#279E55',
+        lossColor: data.lossColor || '#FF6B6B',
+        qrcode: data.qrcode || {},
+        layers: data.layers || []
+      };
+    } catch (e) {
+      console.warn('重新加载配置失败:', e);
+      currentConfig = JSON.parse(JSON.stringify(lbankenConfig));
+    }
+  } else {
+    currentConfig = JSON.parse(JSON.stringify(lbankenConfig));
+  }
   
   renderPreview();
   updateSelectedInfo();
@@ -546,9 +573,20 @@ let configList = [];
 // 加载配置索引
 async function loadConfigIndex() {
   try {
+    // 检查是否为 file:// 协议
+    if (window.location.protocol === 'file:') {
+      console.warn('检测到 file:// 协议，无法使用 fetch 加载配置。请使用本地服务器运行。');
+      throw new Error('file:// 协议不支持 fetch');
+    }
+    
     const response = await fetch('config/index.json');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
     const data = await response.json();
     configList = data.configs || [];
+    
+    console.log('成功加载配置索引:', configList);
     
     // 填充下拉框
     const select = document.getElementById('configSelect');
@@ -569,11 +607,17 @@ async function loadConfigIndex() {
     
     return configList;
   } catch (e) {
-    console.warn('加载配置索引失败，使用内置配置:', e);
+    console.warn('加载配置索引失败:', e.message);
+    console.warn('提示: 请使用本地服务器运行此页面 (如: python -m http.server 8080)');
+    
+    // 使用内置后备配置
     configList = [{ id: 'lbanken', name: 'LBanken (内置)', file: null }];
     
     const select = document.getElementById('configSelect');
     select.innerHTML = '<option value="lbanken">LBanken (内置)</option><option value="custom">自定义配置...</option>';
+    
+    document.getElementById('configName').textContent = '⚠️ 无法加载配置目录，使用内置配置';
+    document.getElementById('configName').style.color = '#FF9500';
     
     return configList;
   }
