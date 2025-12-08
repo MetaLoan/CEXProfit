@@ -1,87 +1,65 @@
 /**
- * 晒单图生成器 - 静态版 v2.2
- * 支持导入 JSON 配置 + 自定义底图
- * 支持自动计算历史价格
- * 支持配置缓存
+ * 晒单图生成器 - 静态版 v3.0
+ * 整合编辑器功能：实时预览、拖拽调整、位置缓存
+ * 
+ * 注意: lbankenConfig 配置在 config.js 中定义
  */
 
 // 缓存 KEY
 const CACHE_KEY = 'profitGenerator_config';
-
-// 内置 LBanken 配置
-const lbankenConfig = {
-  name: 'LBanken',
-  width: 750,
-  height: 1240,
-  dateFormat: 'YYYY/MM/DD HH:mm:ss',
-  displayTexts: {
-    long: 'Long', short: 'Short',
-    open_long: 'Open Long', open_short: 'Open Short',
-    close_long: 'Close Long', close_short: 'Close Short'
-  },
-  dynamicColors: {
-    open_long: '#279E55', open_short: '#FF6B6B',
-    close_long: '#FF6B6B', close_short: '#279E55'
-  },
-  profitColor: '#279E55',
-  lossColor: '#FF6B6B',
-  qrcode: {
-    baseUrl: 'https://lbank.com/ref/',
-    defaultRefCode: '5NCXS'
-  },
-  layers: [
-    {
-      id: 'L8x8ikdz', type: 'text', x: 52, y: 231,
-      fontFamily: 'HarmonyOS Sans SC', fontSize: 14, color: '#ffffff', fontWeight: 400,
-      children: [
-        { text: '{{tradepair}} Perp', fontSize: 26, fontWeight: 400 },
-        { text: '|', gap: 21, color: '#36393F', fontSize: 27, fontWeight: 100 },
-        { text: '{{direction}}', gap: 21, fontSize: 26, fontWeight: 400, dynamicColor: true },
-        { text: '|', gap: 23, color: '#36393F', fontSize: 27, fontWeight: 100 },
-        { text: '{{lev}}x', gap: 22, fontSize: 26, fontWeight: 400 }
-      ]
-    },
-    {
-      id: 'Lpxqskdf', type: 'text', x: 479, y: 67, text: '{{date}}',
-      fontFamily: 'HarmonyOS Sans SC', fontSize: 22, color: '#90959E', fontWeight: 400
-    },
-    {
-      id: 'Lpk1mp1y', type: 'text', x: 52, y: 363, text: '+{{yield}}',
-      fontFamily: 'HarmonyOS Sans SC', fontSize: 64, fontWeight: 700, profitLossColor: true
-    },
-    {
-      id: 'Lbddqvll', type: 'text', x: 53, y: 513, text: '{{entprice}}',
-      fontFamily: 'HarmonyOS Sans SC', fontSize: 25, color: '#ffffff', fontWeight: 400
-    },
-    {
-      id: 'L0l7ylfu', type: 'text', x: 53, y: 617, text: '{{lastprice}}',
-      fontFamily: 'HarmonyOS Sans SC', fontSize: 25, color: '#ffffff', fontWeight: 400
-    },
-    { id: 'Lqrcode1', type: 'qrcode', x: 608, y: 1083, width: 114, height: 114 },
-    {
-      id: 'Lx3l0xzm', type: 'text', x: 41, y: 1099, text: 'Referral Code {{ref}}',
-      fontFamily: 'HarmonyOS Sans SC', fontSize: 31, color: '#ffffff', fontWeight: 400
-    },
-    {
-      id: 'Lm0ffrx6', type: 'text', x: 40, y: 1152, text: 'Sign Up to Take Your Cut of $2M',
-      fontFamily: 'HarmonyOS Sans SC', fontSize: 28, color: '#9095A0', fontWeight: 400
-    }
-  ]
-};
+const POSITION_CACHE_KEY = 'profitGenerator_positions';
 
 // 当前配置
 let currentConfig = null;
 let currentImageData = null;
 let customBgDataUrl = null;
-let isManualTimeMode = false; // 是否手动编辑显示时间模式
+let isManualTimeMode = false;
 
-// 默认底图（优先使用 Base64，备选使用路径）
-const DEFAULT_BG_SRC = (typeof DEFAULT_BG_BASE64 !== 'undefined') ? DEFAULT_BG_BASE64 : 'assets/background.jpg';
+// 编辑器状态
+let isEditMode = false;
+let selectedLayerId = null;
+let scale = 1.0;
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let dragLayerStartX = 0, dragLayerStartY = 0;
+let dragTarget = null;
+let positionModified = false;
 
-// 初始化
+// 默认底图路径
+const DEFAULT_BG_PATH = 'assets/background.jpg';
+let DEFAULT_BG_BASE64 = null;
+
+// ==================== 初始化 ====================
+
+// 加载默认底图并转换为 base64
+async function loadDefaultBackground() {
+  try {
+    const response = await fetch(DEFAULT_BG_PATH);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        DEFAULT_BG_BASE64 = reader.result;
+        resolve(DEFAULT_BG_BASE64);
+      };
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('加载默认底图失败:', e);
+    return null;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+  // 先加载默认底图
+  await loadDefaultBackground();
+  
+  // 加载配置
+  loadConfigSelect();
+  
   // 加载缓存
   loadCache();
+  loadPositionCache();
   
   // 设置默认时间
   const now = new Date();
@@ -94,25 +72,521 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('closeTime').value = formatDateTimeLocal(now);
   }
   
-  // 如果不是手动模式，同步平仓时间到显示时间
   if (!isManualTimeMode) {
     syncDisplayTime();
   }
   
-  // 监听平仓时间变化，自动同步到显示时间
+  // 监听事件
   document.getElementById('closeTime').addEventListener('change', syncDisplayTime);
-  
-  // 监听输入变化，自动保存
   setupAutoSave();
+  setupInputListeners();
+  document.addEventListener('keydown', handleKeydown);
   
-  // 加载配置
-  loadConfigSelect();
+  // 初始化画布
+  initCanvas();
+  
+  // 初始渲染
+  renderPreview();
 });
 
+// 设置输入监听，实时更新预览
+function setupInputListeners() {
+  const inputs = ['tradepair', 'direction', 'action', 'leverage', 'yield', 'entPrice', 'lastPrice', 'displayTime', 'refcode', 'timezone'];
+  inputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', debounce(renderPreview, 200));
+      el.addEventListener('change', renderPreview);
+    }
+  });
+}
 
-// 设置自动保存
+// 防抖函数
+function debounce(fn, delay) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+// 初始化画布
+function initCanvas() {
+  if (!currentConfig) return;
+  
+  const wrapper = document.getElementById('canvasWrapper');
+  wrapper.style.width = currentConfig.width + 'px';
+  wrapper.style.height = currentConfig.height + 'px';
+  
+  // 加载背景图
+  const bg = document.getElementById('canvasBg');
+  bg.src = customBgDataUrl || DEFAULT_BG_BASE64 || DEFAULT_BG_PATH;
+  
+  applyZoom();
+}
+
+// ==================== 编辑模式 ====================
+
+function toggleEditMode() {
+  isEditMode = document.getElementById('editMode').checked;
+  const overlay = document.getElementById('layerOverlay');
+  const toolbar = document.getElementById('editToolbar');
+  
+  if (isEditMode) {
+    overlay.classList.add('edit-mode');
+    toolbar.style.display = 'flex';
+  } else {
+    overlay.classList.remove('edit-mode');
+    toolbar.style.display = 'none';
+    selectedLayerId = null;
+    updateSelectedInfo();
+  }
+  
+  renderPreview();
+}
+
+// ==================== 缩放控制 ====================
+
+function zoomCanvas(delta) {
+  scale = Math.max(0.2, Math.min(1.5, scale + delta));
+  applyZoom();
+}
+
+function resetZoom() {
+  scale = 1.0;
+  applyZoom();
+}
+
+function applyZoom() {
+  document.getElementById('zoomValue').textContent = Math.round(scale * 100) + '%';
+  const wrapper = document.getElementById('canvasWrapper');
+  wrapper.style.transform = `scale(${scale})`;
+  wrapper.style.transformOrigin = 'top center';
+}
+
+// ==================== 实时预览渲染 ====================
+
+function renderPreview() {
+  if (!currentConfig) return;
+  
+  const overlay = document.getElementById('layerOverlay');
+  overlay.innerHTML = '';
+  
+  const vars = getVariables();
+  
+  currentConfig.layers.forEach((layer, index) => {
+    const div = document.createElement('div');
+    div.className = 'layer-item' + (selectedLayerId === layer.id ? ' selected' : '');
+    div.dataset.id = layer.id;
+    div.dataset.index = index;
+    div.style.position = 'absolute';
+    div.style.left = layer.x + 'px';
+    div.style.top = layer.y + 'px';
+    div.style.whiteSpace = 'pre';
+    div.style.fontFamily = layer.fontFamily || "'HarmonyOS Sans SC', sans-serif";
+    div.style.textShadow = '0 0 2px rgba(0,0,0,.8)';
+    
+    if (layer.type === 'qrcode') {
+      div.style.background = '#fff';
+      div.style.padding = '4px';
+      div.style.borderRadius = '4px';
+      div.style.width = layer.width + 'px';
+      div.style.height = layer.height + 'px';
+      
+      const qrUrl = (currentConfig.qrcode?.baseUrl || 'https://lbank.com/ref/') + vars.ref;
+      new QRCode(div, {
+        text: qrUrl,
+        width: layer.width - 8,
+        height: layer.height - 8,
+        colorDark: '#000000',
+        colorLight: '#ffffff'
+      });
+    } else if (layer.children) {
+      div.style.display = 'flex';
+      div.style.alignItems = 'center';
+      
+      layer.children.forEach(child => {
+        const span = document.createElement('span');
+        span.textContent = replaceVars(child.text || '', vars);
+        span.style.fontSize = (child.fontSize || layer.fontSize || 14) + 'px';
+        span.style.fontWeight = child.fontWeight || layer.fontWeight || 400;
+        span.style.fontFamily = child.fontFamily || layer.fontFamily || "'HarmonyOS Sans SC', sans-serif";
+        
+        if (child.gap) span.style.marginLeft = child.gap + 'px';
+        if (child.letterSpacing) span.style.letterSpacing = child.letterSpacing + 'px';
+        
+        if (child.dynamicColor) {
+          span.style.color = currentConfig.dynamicColors?.[vars.directionKey] || '#FFFFFF';
+        } else {
+          span.style.color = child.color || layer.color || '#FFFFFF';
+        }
+        
+        div.appendChild(span);
+      });
+    } else {
+      let text = replaceVars(layer.text || '', vars);
+      
+      if (layer.profitLossColor && text.includes('+') && !vars.isProfit) {
+        text = text.replace('+', '');
+      }
+      
+      div.textContent = text;
+      div.style.fontSize = (layer.fontSize || 14) + 'px';
+      div.style.fontWeight = layer.fontWeight || 400;
+      
+      if (layer.letterSpacing) div.style.letterSpacing = layer.letterSpacing + 'px';
+      if (layer.lineHeight) div.style.lineHeight = layer.lineHeight;
+      
+      if (layer.profitLossColor) {
+        div.style.color = vars.isProfit ? currentConfig.profitColor : currentConfig.lossColor;
+      } else if (layer.dynamicColor) {
+        div.style.color = currentConfig.dynamicColors?.[vars.directionKey] || '#FFFFFF';
+      } else {
+        div.style.color = layer.color || '#FFFFFF';
+      }
+    }
+    
+    // 编辑模式下添加拖拽事件
+    if (isEditMode) {
+      div.addEventListener('mousedown', startDrag);
+    }
+    
+    overlay.appendChild(div);
+  });
+}
+
+// ==================== 拖拽功能 ====================
+
+function startDrag(e) {
+  if (!isEditMode || e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  
+  dragTarget = e.currentTarget;
+  selectLayer(dragTarget.dataset.id);
+  
+  const layer = currentConfig.layers.find(l => l.id === dragTarget.dataset.id);
+  if (!layer) return;
+  
+  isDragging = true;
+  dragTarget.classList.add('dragging');
+  
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragLayerStartX = layer.x;
+  dragLayerStartY = layer.y;
+  
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('mouseup', stopDrag);
+}
+
+function onDrag(e) {
+  if (!isDragging || !dragTarget) return;
+  
+  const layer = currentConfig.layers.find(l => l.id === dragTarget.dataset.id);
+  if (!layer) return;
+  
+  const dx = (e.clientX - dragStartX) / scale;
+  const dy = (e.clientY - dragStartY) / scale;
+  
+  layer.x = Math.max(0, Math.round(dragLayerStartX + dx));
+  layer.y = Math.max(0, Math.round(dragLayerStartY + dy));
+  
+  dragTarget.style.left = layer.x + 'px';
+  dragTarget.style.top = layer.y + 'px';
+  
+  updateSelectedInfo();
+  positionModified = true;
+}
+
+function stopDrag() {
+  if (dragTarget) dragTarget.classList.remove('dragging');
+  isDragging = false;
+  dragTarget = null;
+  document.removeEventListener('mousemove', onDrag);
+  document.removeEventListener('mouseup', stopDrag);
+}
+
+// 键盘微调
+function handleKeydown(e) {
+  if (!isEditMode || !selectedLayerId) return;
+  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  
+  const layer = currentConfig.layers.find(l => l.id === selectedLayerId);
+  if (!layer) return;
+  
+  const step = e.shiftKey ? 10 : 1;
+  let changed = false;
+  
+  switch (e.key) {
+    case 'ArrowUp': layer.y -= step; changed = true; break;
+    case 'ArrowDown': layer.y += step; changed = true; break;
+    case 'ArrowLeft': layer.x -= step; changed = true; break;
+    case 'ArrowRight': layer.x += step; changed = true; break;
+  }
+  
+  if (changed) {
+    e.preventDefault();
+    layer.x = Math.max(0, layer.x);
+    layer.y = Math.max(0, layer.y);
+    positionModified = true;
+    renderPreview();
+    updateSelectedInfo();
+  }
+}
+
+// ==================== 图层选择 ====================
+
+function selectLayer(id) {
+  selectedLayerId = id;
+  updateSelectedInfo();
+  renderPreview();
+}
+
+function updateSelectedInfo() {
+  const nameEl = document.getElementById('selectedLayerName');
+  const coordsEl = document.getElementById('layerCoords');
+  const xInput = document.getElementById('layerX');
+  const yInput = document.getElementById('layerY');
+  const fontSizeLabel = document.getElementById('fontSizeLabel');
+  const fontSizeInput = document.getElementById('layerFontSize');
+  const qrSizeLabel = document.getElementById('qrSizeLabel');
+  const qrSizeInput = document.getElementById('layerQrSize');
+  
+  // 隐藏所有可选输入
+  fontSizeLabel.style.display = 'none';
+  qrSizeLabel.style.display = 'none';
+  
+  if (!selectedLayerId) {
+    nameEl.textContent = '未选中';
+    coordsEl.textContent = '';
+    xInput.value = '';
+    yInput.value = '';
+    fontSizeInput.value = '';
+    qrSizeInput.value = '';
+    return;
+  }
+  
+  const layer = currentConfig.layers.find(l => l.id === selectedLayerId);
+  if (layer) {
+    nameEl.textContent = layer.id;
+    coordsEl.textContent = `(${layer.x}, ${layer.y})`;
+    xInput.value = layer.x;
+    yInput.value = layer.y;
+    
+    // 根据图层类型显示不同的编辑选项
+    if (layer.type === 'qrcode') {
+      qrSizeLabel.style.display = 'flex';
+      qrSizeInput.value = layer.width || 160;
+    } else {
+      fontSizeLabel.style.display = 'flex';
+      fontSizeInput.value = layer.fontSize || 14;
+    }
+  }
+}
+
+function updateLayerPosition() {
+  if (!selectedLayerId) return;
+  
+  const layer = currentConfig.layers.find(l => l.id === selectedLayerId);
+  if (layer) {
+    layer.x = parseInt(document.getElementById('layerX').value) || 0;
+    layer.y = parseInt(document.getElementById('layerY').value) || 0;
+    positionModified = true;
+    renderPreview();
+    updateSelectedInfo();
+  }
+}
+
+function updateLayerStyle() {
+  if (!selectedLayerId) return;
+  
+  const layer = currentConfig.layers.find(l => l.id === selectedLayerId);
+  if (!layer) return;
+  
+  if (layer.type === 'qrcode') {
+    const size = parseInt(document.getElementById('layerQrSize').value) || 160;
+    layer.width = size;
+    layer.height = size;
+  } else {
+    const fontSize = parseInt(document.getElementById('layerFontSize').value) || 14;
+    layer.fontSize = fontSize;
+  }
+  
+  positionModified = true;
+  renderPreview();
+}
+
+// ==================== 位置缓存 ====================
+
+function saveLayerPositions() {
+  const layerStyles = {};
+  currentConfig.layers.forEach(layer => {
+    layerStyles[layer.id] = { 
+      x: layer.x, 
+      y: layer.y,
+      fontSize: layer.fontSize,
+      width: layer.width,
+      height: layer.height
+    };
+  });
+  
+  localStorage.setItem(POSITION_CACHE_KEY, JSON.stringify(layerStyles));
+  positionModified = false;
+  alert('✅ 配置已保存！下次打开将自动恢复。');
+}
+
+function loadPositionCache() {
+  try {
+    const cached = localStorage.getItem(POSITION_CACHE_KEY);
+    if (!cached || !currentConfig) return;
+    
+    const layerStyles = JSON.parse(cached);
+    
+    currentConfig.layers.forEach(layer => {
+      if (layerStyles[layer.id]) {
+        const saved = layerStyles[layer.id];
+        if (saved.x !== undefined) layer.x = saved.x;
+        if (saved.y !== undefined) layer.y = saved.y;
+        if (saved.fontSize !== undefined) layer.fontSize = saved.fontSize;
+        if (saved.width !== undefined) layer.width = saved.width;
+        if (saved.height !== undefined) layer.height = saved.height;
+      }
+    });
+    
+    console.log('配置已从缓存恢复');
+  } catch (e) {
+    console.warn('加载配置缓存失败:', e);
+  }
+}
+
+function resetLayerPositions() {
+  if (!confirm('确定重置所有图层到默认值？')) return;
+  
+  // 重新加载默认配置
+  currentConfig = JSON.parse(JSON.stringify(lbankenConfig));
+  localStorage.removeItem(POSITION_CACHE_KEY);
+  positionModified = false;
+  
+  renderPreview();
+  updateSelectedInfo();
+  alert('✅ 配置已重置！');
+}
+
+function exportConfig() {
+  const data = {
+    width: currentConfig.width,
+    height: currentConfig.height,
+    dateFormat: currentConfig.dateFormat,
+    displayTexts: currentConfig.displayTexts,
+    dynamicColors: currentConfig.dynamicColors,
+    profitColor: currentConfig.profitColor,
+    lossColor: currentConfig.lossColor,
+    qrcode: currentConfig.qrcode,
+    customFontUrls: [],
+    layers: currentConfig.layers
+  };
+  
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `lbanken-config-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ==================== 配置管理 ====================
+
+function loadConfigSelect() {
+  const select = document.getElementById('configSelect').value;
+  
+  if (select === 'custom') {
+    document.getElementById('configFile').click();
+    return;
+  }
+  
+  currentConfig = JSON.parse(JSON.stringify(lbankenConfig));
+  document.getElementById('previewSize').textContent = `${currentConfig.width} × ${currentConfig.height}`;
+  document.getElementById('configName').textContent = `使用内置 LBanken 配置`;
+  
+  initCanvas();
+}
+
+function importConfig(e) {
+  const file = e.target.files[0];
+  if (!file) {
+    document.getElementById('configSelect').value = 'lbanken';
+    loadConfigSelect();
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = JSON.parse(evt.target.result);
+      
+      currentConfig = {
+        name: '自定义',
+        width: data.width || 1050,
+        height: data.height || 1696,
+        dateFormat: data.dateFormat || 'YYYY/MM/DD HH:mm:ss',
+        displayTexts: data.displayTexts || lbankenConfig.displayTexts,
+        dynamicColors: data.dynamicColors || lbankenConfig.dynamicColors,
+        profitColor: data.profitColor || '#279E55',
+        lossColor: data.lossColor || '#FF6B6B',
+        qrcode: data.qrcode || lbankenConfig.qrcode,
+        layers: data.layers || []
+      };
+      
+      document.getElementById('previewSize').textContent = `${currentConfig.width} × ${currentConfig.height}`;
+      document.getElementById('configName').textContent = `✅ 已导入: ${file.name}`;
+      document.getElementById('configSelect').value = 'custom';
+      
+      initCanvas();
+      renderPreview();
+    } catch (err) {
+      alert('配置文件格式错误: ' + err.message);
+      document.getElementById('configSelect').value = 'lbanken';
+      loadConfigSelect();
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ==================== 底图管理 ====================
+
+function loadCustomBg(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    customBgDataUrl = evt.target.result;
+    document.getElementById('canvasBg').src = customBgDataUrl;
+    document.getElementById('bgStatus').textContent = `✅ ${file.name}`;
+    document.getElementById('bgStatus').style.color = '#279E55';
+    saveCache();
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function resetBackground() {
+  customBgDataUrl = null;
+  document.getElementById('canvasBg').src = DEFAULT_BG_BASE64 || DEFAULT_BG_PATH;
+  document.getElementById('bgStatus').textContent = '使用默认底图';
+  document.getElementById('bgStatus').style.color = '';
+  saveCache();
+}
+
+// ==================== 缓存管理 ====================
+
 function setupAutoSave() {
-  const inputs = document.querySelectorAll('input, select');
+  const inputs = document.querySelectorAll('.control-panel input, .control-panel select');
   let saveTimeout;
   
   inputs.forEach(input => {
@@ -127,7 +601,6 @@ function setupAutoSave() {
   });
 }
 
-// 保存缓存
 function saveCache() {
   const cache = {
     tradepair: document.getElementById('tradepair').value,
@@ -149,10 +622,8 @@ function saveCache() {
   };
   
   localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-  console.log('配置已缓存');
 }
 
-// 加载缓存
 function loadCache() {
   try {
     const cached = localStorage.getItem(CACHE_KEY);
@@ -172,6 +643,7 @@ function loadCache() {
     if (cache.entTime) document.getElementById('entTime').value = cache.entTime;
     if (cache.closeTime) document.getElementById('closeTime').value = cache.closeTime;
     if (cache.configSelect) document.getElementById('configSelect').value = cache.configSelect;
+    if (cache.timezone) document.getElementById('timezone').value = cache.timezone;
     
     if (cache.autoCalcPrice) {
       document.getElementById('autoCalcPrice').checked = cache.autoCalcPrice;
@@ -182,10 +654,6 @@ function loadCache() {
       customBgDataUrl = cache.customBgDataUrl;
       document.getElementById('bgStatus').textContent = '✅ 使用自定义底图';
       document.getElementById('bgStatus').style.color = '#279E55';
-    }
-    
-    if (cache.timezone) {
-      document.getElementById('timezone').value = cache.timezone;
     }
     
     if (cache.isManualTimeMode) {
@@ -201,44 +669,28 @@ function loadCache() {
       timeHint.style.color = '#FF9500';
       timezoneSelect.disabled = true;
     }
-    
-    console.log('配置已从缓存恢复');
   } catch (e) {
     console.warn('加载缓存失败:', e);
   }
 }
 
-// 清除缓存
 function clearCache() {
   if (confirm('确定清除所有缓存配置？')) {
     localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(POSITION_CACHE_KEY);
     customBgDataUrl = null;
     location.reload();
   }
 }
 
-// 加载配置选择
-function loadConfigSelect() {
-  const select = document.getElementById('configSelect').value;
-  
-  if (select === 'custom') {
-    document.getElementById('configFile').click();
-    return;
-  }
-  
-  currentConfig = JSON.parse(JSON.stringify(lbankenConfig));
-  document.getElementById('previewSize').textContent = `${currentConfig.width} × ${currentConfig.height}`;
-  document.getElementById('configName').textContent = `使用内置 LBanken 配置`;
-}
+// ==================== 时间处理 ====================
 
-// 切换自动计算模式
 function toggleAutoCalc() {
   const autoCalc = document.getElementById('autoCalcPrice').checked;
   document.getElementById('manualPriceSection').style.display = autoCalc ? 'none' : 'block';
   document.getElementById('autoCalcSection').style.display = autoCalc ? 'block' : 'none';
 }
 
-// 切换手动编辑显示时间模式
 function toggleManualTime() {
   isManualTimeMode = !isManualTimeMode;
   const displayTimeInput = document.getElementById('displayTime');
@@ -249,28 +701,24 @@ function toggleManualTime() {
   if (isManualTimeMode) {
     displayTimeInput.disabled = false;
     editBtn.textContent = '🔄 自动';
-    editBtn.title = '切换回自动同步模式';
     timeHint.textContent = '手动模式：时区转换已禁用';
     timeHint.style.color = '#FF9500';
     timezoneSelect.disabled = true;
   } else {
     displayTimeInput.disabled = true;
     editBtn.textContent = '✏️ 编辑';
-    editBtn.title = '手动编辑显示时间';
     timeHint.textContent = '自动同步平仓时间 + 时区转换';
     timeHint.style.color = '';
     timezoneSelect.disabled = false;
-    // 同步平仓时间到显示时间
     syncDisplayTime();
   }
   saveCache();
+  renderPreview();
 }
 
-// 同步平仓时间到显示时间
 function syncDisplayTime() {
   if (isManualTimeMode) return;
   
-  // 优先使用平仓时间，否则使用当前时间
   let timeToSync = document.getElementById('closeTime').value;
   if (!timeToSync) {
     timeToSync = formatDateTimeLocal(new Date());
@@ -278,7 +726,15 @@ function syncDisplayTime() {
   document.getElementById('displayTime').value = timeToSync;
 }
 
-// 根据方向、价格和杠杆自动计算收益率
+function convertToTimezone(date, targetTimezoneOffset) {
+  const localOffset = -date.getTimezoneOffset();
+  const targetOffset = targetTimezoneOffset * 60;
+  const diff = targetOffset - localOffset;
+  return new Date(date.getTime() + diff * 60 * 1000);
+}
+
+// ==================== 价格获取 ====================
+
 function calculateYield() {
   const direction = document.getElementById('direction').value;
   const entPrice = parseFloat(document.getElementById('entPrice').value) || 0;
@@ -289,18 +745,16 @@ function calculateYield() {
   
   let yieldPercent;
   if (direction === 'long') {
-    // 做多：(当前价格 - 开仓价格) / 开仓价格 * 杠杆 * 100
     yieldPercent = ((lastPrice - entPrice) / entPrice) * leverage * 100;
   } else {
-    // 做空：(开仓价格 - 当前价格) / 开仓价格 * 杠杆 * 100
     yieldPercent = ((entPrice - lastPrice) / entPrice) * leverage * 100;
   }
   
   document.getElementById('yield').value = yieldPercent.toFixed(2);
   saveCache();
+  renderPreview();
 }
 
-// 获取历史价格
 async function fetchPrices() {
   const tradepair = document.getElementById('tradepair').value.toUpperCase();
   const entTimeStr = document.getElementById('entTime').value;
@@ -343,17 +797,16 @@ async function fetchPrices() {
       hint.style.color = '#279E55';
       
       saveCache();
+      renderPreview();
     } else {
       throw new Error('无法获取价格数据');
     }
   } catch (error) {
-    console.error('获取价格失败:', error);
     hint.innerHTML = `❌ 获取失败: ${error.message}`;
     hint.style.color = '#FF6B6B';
   }
 }
 
-// 从 Binance 获取 K 线数据
 async function fetchBinanceKline(symbol, timestamp) {
   const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1m&startTime=${timestamp}&limit=1`;
   
@@ -367,128 +820,14 @@ async function fetchBinanceKline(symbol, timestamp) {
     }
     return null;
   } catch (error) {
-    console.warn('Binance API 访问失败，使用模拟数据');
     const basePrice = symbol.includes('BTC') ? 95000 : 3500;
     const variance = (Math.random() - 0.5) * basePrice * 0.1;
     return basePrice + variance;
   }
 }
 
-// 导入自定义配置
-function importConfig(e) {
-  const file = e.target.files[0];
-  if (!file) {
-    document.getElementById('configSelect').value = 'lbanken';
-    loadConfigSelect();
-    return;
-  }
-  
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    try {
-      const data = JSON.parse(evt.target.result);
-      
-      currentConfig = {
-        name: '自定义',
-        width: data.width || 750,
-        height: data.height || 1240,
-        dateFormat: data.dateFormat || 'YYYY/MM/DD HH:mm:ss',
-        displayTexts: data.displayTexts || lbankenConfig.displayTexts,
-        dynamicColors: data.dynamicColors || lbankenConfig.dynamicColors,
-        profitColor: data.profitColor || '#279E55',
-        lossColor: data.lossColor || '#FF6B6B',
-        qrcode: data.qrcode || lbankenConfig.qrcode,
-        layers: data.layers || []
-      };
-      
-      document.getElementById('previewSize').textContent = `${currentConfig.width} × ${currentConfig.height}`;
-      document.getElementById('configName').textContent = `✅ 已导入: ${file.name}`;
-      document.getElementById('configSelect').value = 'custom';
-      
-      console.log('配置导入成功:', currentConfig);
-    } catch (err) {
-      alert('配置文件格式错误: ' + err.message);
-      document.getElementById('configSelect').value = 'lbanken';
-      loadConfigSelect();
-    }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
-}
+// ==================== 变量获取 ====================
 
-// 加载自定义底图
-function loadCustomBg(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    customBgDataUrl = evt.target.result;
-    document.getElementById('bgStatus').textContent = `✅ ${file.name}`;
-    document.getElementById('bgStatus').style.color = '#279E55';
-    saveCache();
-  };
-  reader.readAsDataURL(file);
-  e.target.value = '';
-}
-
-// 重置底图
-function resetBackground() {
-  customBgDataUrl = null;
-  document.getElementById('bgStatus').textContent = '使用默认底图';
-  document.getElementById('bgStatus').style.color = '';
-  saveCache();
-}
-
-function formatDateTimeLocal(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  const h = String(date.getHours()).padStart(2, '0');
-  const min = String(date.getMinutes()).padStart(2, '0');
-  return `${y}-${m}-${d}T${h}:${min}`;
-}
-
-function formatDisplayDate(date, format) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  const h = String(date.getHours()).padStart(2, '0');
-  const min = String(date.getMinutes()).padStart(2, '0');
-  const sec = String(date.getSeconds()).padStart(2, '0');
-  
-  return format
-    .replace('YYYY', y)
-    .replace('MM', m)
-    .replace('DD', d)
-    .replace('HH', h)
-    .replace('mm', min)
-    .replace('ss', sec);
-}
-
-function formatNumber(num) {
-  const n = parseFloat(num);
-  if (n >= 100) return n.toFixed(2);
-  if (n >= 10) return n.toFixed(3);
-  return n.toFixed(4);
-}
-
-// 将时间转换到目标时区
-function convertToTimezone(date, targetTimezoneOffset) {
-  // 获取本地时区偏移（分钟），注意 getTimezoneOffset 返回的是 UTC - 本地时间，所以需要取反
-  const localOffset = -date.getTimezoneOffset(); // 本地时区偏移（分钟）
-  const targetOffset = targetTimezoneOffset * 60; // 目标时区偏移（分钟）
-  
-  // 计算差值（分钟）
-  const diff = targetOffset - localOffset;
-  
-  // 创建新的日期对象，调整时间
-  const convertedDate = new Date(date.getTime() + diff * 60 * 1000);
-  
-  return convertedDate;
-}
-
-// 获取变量
 function getVariables() {
   const tradepair = document.getElementById('tradepair').value.toUpperCase();
   const direction = document.getElementById('direction').value;
@@ -500,22 +839,18 @@ function getVariables() {
   const refcode = document.getElementById('refcode').value || '5NCXS';
   
   let finalTime;
-  
-  // 获取显示时间（自动模式下已同步平仓时间）
   const displayTimeStr = document.getElementById('displayTime').value;
   const displayTime = displayTimeStr ? new Date(displayTimeStr) : new Date();
   
   if (isManualTimeMode) {
-    // 手动模式：直接使用显示时间，不进行时区转换
     finalTime = displayTime;
   } else {
-    // 自动模式：使用显示时间 + 时区转换
     const timezone = parseInt(document.getElementById('timezone').value) || 8;
     finalTime = convertToTimezone(displayTime, timezone);
   }
   
   const dirKey = action ? `${action}_${direction}` : direction;
-  const directionText = currentConfig.displayTexts?.[dirKey] || direction;
+  const directionText = currentConfig?.displayTexts?.[dirKey] || direction;
   
   return {
     tradepair: tradepair,
@@ -525,31 +860,24 @@ function getVariables() {
     yield: yieldValue.toFixed(2) + '%',
     entprice: formatNumber(entPrice),
     lastprice: formatNumber(lastPrice),
-    date: formatDisplayDate(finalTime, currentConfig.dateFormat || 'YYYY/MM/DD HH:mm:ss'),
+    date: formatDisplayDate(finalTime, currentConfig?.dateFormat || 'YYYY/MM/DD HH:mm:ss'),
     ref: refcode,
     isProfit: yieldValue >= 0,
     directionKey: dirKey
   };
 }
 
-// 替换变量
-function replaceVars(text, vars) {
-  return text.replace(/\{\{(\w+)\}\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m);
-}
+// ==================== 图片生成 ====================
 
-// 生成图片
 async function generateImage() {
   const btn = document.getElementById('generateBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> 生成中...';
   
   try {
-    if (!currentConfig) {
-      loadConfigSelect();
-    }
+    if (!currentConfig) loadConfigSelect();
     
     const vars = getVariables();
-    
     const renderContainer = document.getElementById('renderContainer');
     renderContainer.innerHTML = '';
     
@@ -560,23 +888,18 @@ async function generateImage() {
     template.style.fontFamily = "'HarmonyOS Sans SC', 'Noto Sans SC', sans-serif";
     template.style.background = '#1a1a2e';
     
-    // 背景图
-    const bgSrc = customBgDataUrl || DEFAULT_BG_SRC;
-    
+    const bgSrc = customBgDataUrl || DEFAULT_BG_BASE64 || DEFAULT_BG_PATH;
     const bg = document.createElement('img');
     bg.src = bgSrc;
     bg.style.cssText = 'position:absolute;width:100%;height:100%;object-fit:cover;';
     template.appendChild(bg);
     
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       bg.onload = resolve;
-      bg.onerror = () => {
-        console.warn('背景图加载失败，使用纯色背景');
-        resolve(); // 继续执行，使用纯色背景
-      };
+      bg.onerror = resolve;
     });
     
-    // 渲染图层
+    // 渲染图层（使用当前调整后的位置）
     for (const layer of currentConfig.layers) {
       const div = document.createElement('div');
       div.style.position = 'absolute';
@@ -664,20 +987,10 @@ async function generateImage() {
     });
     
     currentImageData = canvas.toDataURL('image/png');
-    
-    const previewArea = document.getElementById('previewArea');
-    previewArea.innerHTML = '';
-    previewArea.className = '';
-    
-    const img = document.createElement('img');
-    img.src = currentImageData;
-    img.style.maxWidth = '100%';
-    img.style.maxHeight = 'calc(100vh - 100px)';
-    img.style.borderRadius = '8px';
-    img.style.boxShadow = '0 4px 30px rgba(0,0,0,0.5)';
-    previewArea.appendChild(img);
-    
     document.getElementById('downloadBtn').style.display = 'flex';
+    
+    // 自动下载
+    downloadImage();
     
   } catch (error) {
     console.error('生成失败:', error);
@@ -688,7 +1001,6 @@ async function generateImage() {
   }
 }
 
-// 下载图片
 function downloadImage() {
   if (!currentImageData) return;
   
@@ -701,7 +1013,8 @@ function downloadImage() {
   document.body.removeChild(a);
 }
 
-// 快捷填充
+// ==================== 快捷填充 ====================
+
 function fillRandom() {
   document.getElementById('yield').value = (Math.random() * 200 - 50).toFixed(2);
   document.getElementById('leverage').value = Math.floor(Math.random() * 100) + 10;
@@ -710,6 +1023,7 @@ function fillRandom() {
   document.getElementById('direction').value = Math.random() > 0.5 ? 'long' : 'short';
   document.getElementById('action').value = Math.random() > 0.5 ? 'close' : 'open';
   saveCache();
+  renderPreview();
 }
 
 function fillProfit() {
@@ -720,6 +1034,7 @@ function fillProfit() {
   document.getElementById('direction').value = 'long';
   document.getElementById('action').value = 'close';
   saveCache();
+  renderPreview();
 }
 
 function fillLoss() {
@@ -730,4 +1045,5 @@ function fillLoss() {
   document.getElementById('direction').value = 'short';
   document.getElementById('action').value = 'close';
   saveCache();
+  renderPreview();
 }

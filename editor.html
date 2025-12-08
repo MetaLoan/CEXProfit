@@ -430,7 +430,7 @@
       
       <div class="form-group">
         <label>时间</label>
-        <input type="datetime-local" id="displayTime" onchange="renderLayers()">
+        <input type="datetime-local" id="displayTime" step="1" onchange="renderLayers()">
       </div>
       
       <div class="form-group">
@@ -537,9 +537,15 @@
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label>颜色</label>
-        <input type="color" id="propColor" onchange="updateSelectedStyle()" style="width:100%;height:32px;">
+      <div class="form-row">
+        <div class="form-group">
+          <label>字间距 (px)</label>
+          <input type="number" id="propLetterSpacing" step="0.1" onchange="updateSelectedStyle()">
+        </div>
+        <div class="form-group">
+          <label>颜色</label>
+          <input type="color" id="propColor" onchange="updateSelectedStyle()" style="height:32px;">
+        </div>
       </div>
       
       <div class="section-title">📄 配置预览</div>
@@ -550,69 +556,13 @@
   <script src="js/html2canvas.min.js"></script>
   <script src="js/qrcode.min.js"></script>
   <script src="js/backgrounds.js"></script>
+  <script src="js/config.js"></script>
   <script>
-    // 完整配置（从原始 model.json 复制）
+    // 配置映射 - lbanken 使用共享的 lbankenConfig
     const configs = {
-      lbanken: {
-        width: 750, height: 1240,
-        dateFormat: 'YYYY/MM/DD HH:mm:ss',
-        displayTexts: {
-          long: 'Long', short: 'Short',
-          open_long: 'Open Long', open_short: 'Open Short',
-          close_long: 'Close Long', close_short: 'Close Short'
-        },
-        profitColor: '#279E55', lossColor: '#FF6B6B',
-        dynamicColors: {
-          open_long: '#279E55', open_short: '#FF6B6B',
-          close_long: '#FF6B6B', close_short: '#279E55'
-        },
-        layers: [
-          {
-            id: 'L8x8ikdz', type: 'text', x: 52, y: 231,
-            fontFamily: 'HarmonyOS Sans SC', fontSize: 14, color: '#ffffff', fontWeight: 400,
-            letterSpacing: 0, lineHeight: 1.2,
-            children: [
-              { text: '{{tradepair}} Perp', fontSize: 26, fontWeight: 400 },
-              { text: '|', gap: 21, color: '#36393F', fontSize: 27, fontWeight: 100 },
-              { text: '{{direction}}', gap: 21, fontSize: 26, fontWeight: 400, dynamicColor: true },
-              { text: '|', gap: 23, color: '#36393F', fontSize: 27, fontWeight: 100 },
-              { text: '{{lev}}x', gap: 22, fontSize: 26, fontWeight: 400 }
-            ]
-          },
-          {
-            id: 'Lpxqskdf', type: 'text', x: 479, y: 67, text: '{{date}}',
-            fontFamily: 'HarmonyOS Sans SC', fontSize: 22, color: '#90959E', fontWeight: 400,
-            letterSpacing: 0.4, lineHeight: 1.2
-          },
-          {
-            id: 'Lpk1mp1y', type: 'text', x: 52, y: 363, text: '+{{yield}}',
-            fontFamily: 'HarmonyOS Sans SC', fontSize: 64, color: '#279E55', fontWeight: 700,
-            letterSpacing: 0, lineHeight: 1.2, profitLossColor: true
-          },
-          {
-            id: 'Lbddqvll', type: 'text', x: 53, y: 513, text: '{{entprice}}',
-            fontFamily: 'HarmonyOS Sans SC', fontSize: 25, color: '#ffffff', fontWeight: 400,
-            letterSpacing: 0.7, lineHeight: 1.2
-          },
-          {
-            id: 'L0l7ylfu', type: 'text', x: 53, y: 617, text: '{{lastprice}}',
-            fontFamily: 'HarmonyOS Sans SC', fontSize: 25, color: '#ffffff', fontWeight: 400,
-            letterSpacing: 0.7, lineHeight: 1.2
-          },
-          {
-            id: 'Lqrcode1', type: 'qrcode', x: 608, y: 1083, width: 114, height: 114
-          },
-          {
-            id: 'Lx3l0xzm', type: 'text', x: 41, y: 1099, text: 'Referral Code {{ref}}',
-            fontFamily: 'HarmonyOS Sans SC', fontSize: 31, color: '#ffffff', fontWeight: 400,
-            letterSpacing: 0.6, lineHeight: 1.2
-          },
-          {
-            id: 'Lm0ffrx6', type: 'text', x: 40, y: 1152, text: 'Sign Up to Take Your Cut of $2M',
-            fontFamily: 'HarmonyOS Sans SC', fontSize: 28, color: '#9095A0', fontWeight: 400,
-            letterSpacing: 0, lineHeight: 1.2
-          }
-        ]
+      // 直接引用 config.js 中的 lbankenConfig
+      get lbanken() {
+        return lbankenConfig;
       },
       easicoin: {
         width: 908, height: 1280,
@@ -656,32 +606,7 @@
       document.addEventListener('keydown', handleKeydown);
     });
     
-    function formatDateTimeLocal(date) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      const h = String(date.getHours()).padStart(2, '0');
-      const min = String(date.getMinutes()).padStart(2, '0');
-      return `${y}-${m}-${d}T${h}:${min}`;
-    }
-    
-    function formatDisplayDate(date, format) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      const h = String(date.getHours()).padStart(2, '0');
-      const min = String(date.getMinutes()).padStart(2, '0');
-      const sec = String(date.getSeconds()).padStart(2, '0');
-      return format.replace('YYYY', y).replace('MM', m).replace('DD', d)
-        .replace('HH', h).replace('mm', min).replace('ss', sec);
-    }
-    
-    function formatNumber(num) {
-      const n = parseFloat(num);
-      if (n >= 100) return n.toFixed(2);
-      if (n >= 10) return n.toFixed(3);
-      return n.toFixed(4);
-    }
+    // 使用 config.js 中的共享函数: formatDateTimeLocal, formatDisplayDate, formatNumber, replaceVars
     
     function loadExchange() {
       const exchange = document.getElementById('exchange').value;
@@ -763,24 +688,25 @@
       
       const config = configs[exchange];
       const dirKey = action ? `${action}_${direction}` : direction;
+      const directionText = config.displayTexts?.[dirKey] || direction;
       
+      // 与 app.js 保持一致的变量格式
       return {
-        tradepair: tradepair.replace('USDT', '/USDT'),
-        direction: config.displayTexts[dirKey] || direction,
+        tradepair: tradepair.toUpperCase(),
+        direction: directionText,
         lev: leverage,
-        yield: yieldValue.toFixed(2) + '%',  // 不加符号，由模板决定
+        leverage: leverage,
+        yield: yieldValue.toFixed(2) + '%',
         entprice: formatNumber(entPrice),
         lastprice: formatNumber(lastPrice),
-        date: formatDisplayDate(displayTime, config.dateFormat),
+        date: formatDisplayDate(displayTime, config.dateFormat || 'YYYY/MM/DD HH:mm:ss'),
         ref: refcode,
         isProfit: yieldValue >= 0,
         directionKey: dirKey
       };
     }
     
-    function replaceVars(text, vars) {
-      return text.replace(/\{\{(\w+)\}\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m);
-    }
+    // replaceVars 使用 config.js 中的共享函数
     
     function renderLayers() {
       const overlay = document.getElementById('layerOverlay');
@@ -795,60 +721,75 @@
         div.className = 'layer-item' + (selectedLayerId === layer.id ? ' selected' : '');
         div.dataset.id = layer.id;
         div.dataset.index = index;
+        div.style.position = 'absolute';
         div.style.left = layer.x + 'px';
         div.style.top = layer.y + 'px';
-        div.style.fontFamily = layer.fontFamily || globalFont;
+        div.style.whiteSpace = 'pre';
+        div.style.fontFamily = layer.fontFamily || globalFont || "'HarmonyOS Sans SC', sans-serif";
+        div.style.textShadow = '0 0 2px rgba(0,0,0,.8)';
         
-        if (layer.type === 'text' || !layer.type) {
-          if (layer.children) {
-            div.classList.add('layer-children');
-            layer.children.forEach(child => {
-              const span = document.createElement('span');
-              span.className = 'layer-child';
-              span.textContent = replaceVars(child.text, vars);
-              span.style.fontSize = (child.fontSize || layer.fontSize || 14) + 'px';
-              span.style.fontWeight = child.fontWeight || layer.fontWeight || 400;
-              span.style.fontFamily = child.fontFamily || layer.fontFamily || globalFont;
-              
-              if (child.gap) span.style.marginLeft = child.gap + 'px';
-              if (child.letterSpacing) span.style.letterSpacing = child.letterSpacing + 'px';
-              
-              if (child.dynamicColor) {
-                span.style.color = config.dynamicColors[vars.directionKey] || '#FFFFFF';
-              } else {
-                span.style.color = child.color || layer.color || '#FFFFFF';
-              }
-              
-              div.appendChild(span);
-            });
-          } else {
-            let text = replaceVars(layer.text || '', vars);
-            div.textContent = text;
-            div.style.fontSize = (layer.fontSize || 14) + 'px';
-            div.style.fontWeight = layer.fontWeight || 400;
-            if (layer.letterSpacing) div.style.letterSpacing = layer.letterSpacing + 'px';
-            if (layer.lineHeight) div.style.lineHeight = layer.lineHeight;
-            
-            if (layer.profitLossColor) {
-              div.style.color = vars.isProfit ? config.profitColor : config.lossColor;
-            } else if (layer.dynamicColor) {
-              div.style.color = config.dynamicColors[vars.directionKey] || '#FFFFFF';
-            } else {
-              div.style.color = layer.color || '#FFFFFF';
-            }
-          }
-        } else if (layer.type === 'qrcode') {
+        if (layer.type === 'qrcode') {
           div.classList.add('qrcode-layer');
+          div.style.background = '#fff';
+          div.style.padding = '4px';
+          div.style.borderRadius = '4px';
           div.style.width = layer.width + 'px';
           div.style.height = layer.height + 'px';
           
+          const qrUrl = (config.qrcode?.baseUrl || 'https://lbank.com/ref/') + vars.ref;
           new QRCode(div, {
-            text: 'https://lbank.com/ref/' + vars.ref,
+            text: qrUrl,
             width: layer.width - 8,
             height: layer.height - 8,
             colorDark: '#000000',
             colorLight: '#ffffff'
           });
+        } else if (layer.children) {
+          div.style.display = 'flex';
+          div.style.alignItems = 'center';
+          div.classList.add('layer-children');
+          
+          layer.children.forEach(child => {
+            const span = document.createElement('span');
+            span.className = 'layer-child';
+            span.textContent = replaceVars(child.text || '', vars);
+            span.style.fontSize = (child.fontSize || layer.fontSize || 14) + 'px';
+            span.style.fontWeight = child.fontWeight || layer.fontWeight || 400;
+            span.style.fontFamily = child.fontFamily || layer.fontFamily || globalFont || "'HarmonyOS Sans SC', sans-serif";
+            
+            if (child.gap) span.style.marginLeft = child.gap + 'px';
+            if (child.letterSpacing) span.style.letterSpacing = child.letterSpacing + 'px';
+            
+            if (child.dynamicColor) {
+              span.style.color = config.dynamicColors?.[vars.directionKey] || '#FFFFFF';
+            } else {
+              span.style.color = child.color || layer.color || '#FFFFFF';
+            }
+            
+            div.appendChild(span);
+          });
+        } else {
+          let text = replaceVars(layer.text || '', vars);
+          
+          // 处理盈亏符号 - 与 app.js 保持一致
+          if (layer.profitLossColor && text.includes('+') && !vars.isProfit) {
+            text = text.replace('+', '');
+          }
+          
+          div.textContent = text;
+          div.style.fontSize = (layer.fontSize || 14) + 'px';
+          div.style.fontWeight = layer.fontWeight || 400;
+          
+          if (layer.letterSpacing) div.style.letterSpacing = layer.letterSpacing + 'px';
+          if (layer.lineHeight) div.style.lineHeight = layer.lineHeight;
+          
+          if (layer.profitLossColor) {
+            div.style.color = vars.isProfit ? config.profitColor : config.lossColor;
+          } else if (layer.dynamicColor) {
+            div.style.color = config.dynamicColors?.[vars.directionKey] || '#FFFFFF';
+          } else {
+            div.style.color = layer.color || '#FFFFFF';
+          }
         }
         
         div.addEventListener('mousedown', startDrag);
@@ -878,6 +819,7 @@
         document.getElementById('propY').value = layer.y;
         document.getElementById('propFontSize').value = layer.fontSize || '';
         document.getElementById('propFontWeight').value = layer.fontWeight || '400';
+        document.getElementById('propLetterSpacing').value = layer.letterSpacing || 0;
         document.getElementById('propColor').value = layer.color?.startsWith('#') ? layer.color : '#ffffff';
       }
       
@@ -907,9 +849,11 @@
       if (layer) {
         const fontSize = parseInt(document.getElementById('propFontSize').value);
         const fontWeight = parseInt(document.getElementById('propFontWeight').value);
+        const letterSpacing = parseFloat(document.getElementById('propLetterSpacing').value);
         const color = document.getElementById('propColor').value;
         if (fontSize) layer.fontSize = fontSize;
         if (fontWeight) layer.fontWeight = fontWeight;
+        layer.letterSpacing = isNaN(letterSpacing) ? 0 : letterSpacing;
         if (color) layer.color = color;
         renderLayers();
         updateJSONPreview();
