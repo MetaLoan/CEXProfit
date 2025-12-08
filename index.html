@@ -21,14 +21,13 @@
       <div class="form-group">
         <label>📂 配置模板</label>
         <div style="display:flex;gap:8px;">
-          <select id="configSelect" style="flex:1;" onchange="loadConfigSelect()">
-            <option value="lbanken">LBanken (内置)</option>
-            <option value="custom">自定义配置...</option>
+          <select id="configSelect" style="flex:1;" onchange="onConfigSelectChange()">
+            <!-- 选项由 JS 动态生成 -->
           </select>
           <button class="btn-small" onclick="document.getElementById('configFile').click()">导入</button>
         </div>
         <input type="file" id="configFile" accept=".json" style="display:none" onchange="importConfig(event)">
-        <div class="hint" id="configName">使用内置 LBanken 配置</div>
+        <div class="hint" id="configName">加载中...</div>
       </div>
 
       <!-- 交易对输入 -->
@@ -215,6 +214,17 @@
           <label>X:<input type="number" id="layerX" onchange="updateLayerPosition()"></label>
           <label>Y:<input type="number" id="layerY" onchange="updateLayerPosition()"></label>
           <label id="fontSizeLabel" style="display:none;">字号:<input type="number" id="layerFontSize" min="8" max="200" onchange="updateLayerStyle()"></label>
+          <label id="fontWeightLabel" style="display:none;">字重:<select id="layerFontWeight" onchange="updateLayerStyle()">
+            <option value="100">100 Thin</option>
+            <option value="300">300 Light</option>
+            <option value="400">400 Regular</option>
+            <option value="500">500 Medium</option>
+            <option value="600">600 Semi</option>
+            <option value="700">700 Bold</option>
+            <option value="900">900 Black</option>
+          </select></label>
+          <label id="letterSpacingLabel" style="display:none;">间距:<input type="number" id="layerLetterSpacing" step="0.1" onchange="updateLayerStyle()"></label>
+          <label id="textContentLabel" style="display:none;">内容:<input type="text" id="layerTextContent" onchange="updateLayerStyle()"></label>
           <label id="qrSizeLabel" style="display:none;">尺寸:<input type="number" id="layerQrSize" min="50" max="300" onchange="updateLayerStyle()"></label>
           <button class="btn-tool" onclick="resetLayerPositions()" title="重置">↺</button>
           <button class="btn-tool btn-save" onclick="saveLayerPositions()" title="保存">💾</button>

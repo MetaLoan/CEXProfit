@@ -237,3 +237,4 @@ function getVariablesFromInputs(inputs, config) {
     directionKey: dirKey
   };
 }
+

@@ -1,0 +1,14 @@
+{
+  "configs": [
+    {
+      "id": "lbanken",
+      "name": "LBanken",
+      "file": "lbanken.json"
+    },
+    {
+      "id": "lbanken-config-1765182081938",
+      "name": "LBanken 配置 2",
+      "file": "lbanken-config-1765182081938.json"
+    }
+  ]
+}

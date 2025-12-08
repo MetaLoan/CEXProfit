@@ -54,12 +54,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 先加载默认底图
   await loadDefaultBackground();
   
-  // 加载配置
-  loadConfigSelect();
+  // 加载配置（必须等待完成）
+  await loadConfigSelect();
   
   // 加载缓存
   loadCache();
-  loadPositionCache();
   
   // 设置默认时间
   const now = new Date();
@@ -350,11 +349,20 @@ function updateSelectedInfo() {
   const yInput = document.getElementById('layerY');
   const fontSizeLabel = document.getElementById('fontSizeLabel');
   const fontSizeInput = document.getElementById('layerFontSize');
+  const fontWeightLabel = document.getElementById('fontWeightLabel');
+  const fontWeightSelect = document.getElementById('layerFontWeight');
+  const letterSpacingLabel = document.getElementById('letterSpacingLabel');
+  const letterSpacingInput = document.getElementById('layerLetterSpacing');
+  const textContentLabel = document.getElementById('textContentLabel');
+  const textContentInput = document.getElementById('layerTextContent');
   const qrSizeLabel = document.getElementById('qrSizeLabel');
   const qrSizeInput = document.getElementById('layerQrSize');
   
   // 隐藏所有可选输入
   fontSizeLabel.style.display = 'none';
+  fontWeightLabel.style.display = 'none';
+  letterSpacingLabel.style.display = 'none';
+  textContentLabel.style.display = 'none';
   qrSizeLabel.style.display = 'none';
   
   if (!selectedLayerId) {
@@ -363,6 +371,9 @@ function updateSelectedInfo() {
     xInput.value = '';
     yInput.value = '';
     fontSizeInput.value = '';
+    fontWeightSelect.value = '400';
+    letterSpacingInput.value = '';
+    textContentInput.value = '';
     qrSizeInput.value = '';
     return;
   }
@@ -381,6 +392,18 @@ function updateSelectedInfo() {
     } else {
       fontSizeLabel.style.display = 'flex';
       fontSizeInput.value = layer.fontSize || 14;
+      
+      fontWeightLabel.style.display = 'flex';
+      fontWeightSelect.value = layer.fontWeight || 400;
+      
+      letterSpacingLabel.style.display = 'flex';
+      letterSpacingInput.value = layer.letterSpacing || 0;
+      
+      // 只有非 children 类型的图层才显示文字内容编辑
+      if (!layer.children && layer.text) {
+        textContentLabel.style.display = 'flex';
+        textContentInput.value = layer.text || '';
+      }
     }
   }
 }
@@ -400,19 +423,30 @@ function updateLayerPosition() {
 
 function updateLayerStyle() {
   if (!selectedLayerId) return;
-  
+
   const layer = currentConfig.layers.find(l => l.id === selectedLayerId);
   if (!layer) return;
-  
+
   if (layer.type === 'qrcode') {
     const size = parseInt(document.getElementById('layerQrSize').value) || 160;
     layer.width = size;
     layer.height = size;
   } else {
     const fontSize = parseInt(document.getElementById('layerFontSize').value) || 14;
+    const fontWeight = parseInt(document.getElementById('layerFontWeight').value) || 400;
+    const letterSpacing = parseFloat(document.getElementById('layerLetterSpacing').value) || 0;
+    const textContent = document.getElementById('layerTextContent').value;
+    
     layer.fontSize = fontSize;
+    layer.fontWeight = fontWeight;
+    layer.letterSpacing = letterSpacing;
+    
+    // 只有非 children 类型的图层才更新文字内容
+    if (!layer.children && textContent !== undefined) {
+      layer.text = textContent;
+    }
   }
-  
+
   positionModified = true;
   renderPreview();
 }
@@ -422,15 +456,18 @@ function updateLayerStyle() {
 function saveLayerPositions() {
   const layerStyles = {};
   currentConfig.layers.forEach(layer => {
-    layerStyles[layer.id] = { 
-      x: layer.x, 
+    layerStyles[layer.id] = {
+      x: layer.x,
       y: layer.y,
       fontSize: layer.fontSize,
+      fontWeight: layer.fontWeight,
+      letterSpacing: layer.letterSpacing,
+      text: layer.text,
       width: layer.width,
       height: layer.height
     };
   });
-  
+
   localStorage.setItem(POSITION_CACHE_KEY, JSON.stringify(layerStyles));
   positionModified = false;
   alert('✅ 配置已保存！下次打开将自动恢复。');
@@ -449,6 +486,9 @@ function loadPositionCache() {
         if (saved.x !== undefined) layer.x = saved.x;
         if (saved.y !== undefined) layer.y = saved.y;
         if (saved.fontSize !== undefined) layer.fontSize = saved.fontSize;
+        if (saved.fontWeight !== undefined) layer.fontWeight = saved.fontWeight;
+        if (saved.letterSpacing !== undefined) layer.letterSpacing = saved.letterSpacing;
+        if (saved.text !== undefined && !layer.children) layer.text = saved.text;
         if (saved.width !== undefined) layer.width = saved.width;
         if (saved.height !== undefined) layer.height = saved.height;
       }
@@ -500,39 +540,62 @@ function exportConfig() {
 
 // ==================== 配置管理 ====================
 
-function loadConfigSelect() {
-  const select = document.getElementById('configSelect').value;
-  
-  if (select === 'custom') {
-    document.getElementById('configFile').click();
-    return;
+// 配置列表缓存
+let configList = [];
+
+// 加载配置索引
+async function loadConfigIndex() {
+  try {
+    const response = await fetch('config/index.json');
+    const data = await response.json();
+    configList = data.configs || [];
+    
+    // 填充下拉框
+    const select = document.getElementById('configSelect');
+    select.innerHTML = '';
+    
+    configList.forEach(cfg => {
+      const option = document.createElement('option');
+      option.value = cfg.id;
+      option.textContent = cfg.name;
+      select.appendChild(option);
+    });
+    
+    // 添加自定义选项
+    const customOption = document.createElement('option');
+    customOption.value = 'custom';
+    customOption.textContent = '自定义配置...';
+    select.appendChild(customOption);
+    
+    return configList;
+  } catch (e) {
+    console.warn('加载配置索引失败，使用内置配置:', e);
+    configList = [{ id: 'lbanken', name: 'LBanken (内置)', file: null }];
+    
+    const select = document.getElementById('configSelect');
+    select.innerHTML = '<option value="lbanken">LBanken (内置)</option><option value="custom">自定义配置...</option>';
+    
+    return configList;
   }
-  
-  currentConfig = JSON.parse(JSON.stringify(lbankenConfig));
-  document.getElementById('previewSize').textContent = `${currentConfig.width} × ${currentConfig.height}`;
-  document.getElementById('configName').textContent = `使用内置 LBanken 配置`;
-  
-  initCanvas();
 }
 
-function importConfig(e) {
-  const file = e.target.files[0];
-  if (!file) {
-    document.getElementById('configSelect').value = 'lbanken';
-    loadConfigSelect();
-    return;
-  }
+// 加载指定配置
+async function loadConfig(configId) {
+  const cfgInfo = configList.find(c => c.id === configId);
   
-  const reader = new FileReader();
-  reader.onload = function(evt) {
+  if (!cfgInfo || !cfgInfo.file) {
+    // 使用内置配置
+    currentConfig = JSON.parse(JSON.stringify(lbankenConfig));
+    document.getElementById('configName').textContent = `使用内置 LBanken 配置`;
+  } else {
     try {
-      const data = JSON.parse(evt.target.result);
-      
+      const response = await fetch(`config/${cfgInfo.file}`);
+      const data = await response.json();
       currentConfig = {
-        name: '自定义',
+        name: data.name || cfgInfo.name,
         width: data.width || 1050,
         height: data.height || 1696,
-        dateFormat: data.dateFormat || 'YYYY/MM/DD HH:mm:ss',
+        dateFormat: data.dateFormat || 'YYYY-MM-DD HH:mm:ss',
         displayTexts: data.displayTexts || lbankenConfig.displayTexts,
         dynamicColors: data.dynamicColors || lbankenConfig.dynamicColors,
         profitColor: data.profitColor || '#279E55',
@@ -540,17 +603,92 @@ function importConfig(e) {
         qrcode: data.qrcode || lbankenConfig.qrcode,
         layers: data.layers || []
       };
-      
+      document.getElementById('configName').textContent = `使用 ${cfgInfo.name} 配置`;
+    } catch (e) {
+      console.warn('加载配置文件失败，使用内置配置:', e);
+      currentConfig = JSON.parse(JSON.stringify(lbankenConfig));
+      document.getElementById('configName').textContent = `使用内置 LBanken 配置`;
+    }
+  }
+  
+  document.getElementById('previewSize').textContent = `${currentConfig.width} × ${currentConfig.height}`;
+  
+  // 加载位置缓存
+  loadPositionCache();
+  
+  initCanvas();
+  renderPreview();
+}
+
+// 下拉框变化事件
+async function onConfigSelectChange() {
+  const select = document.getElementById('configSelect').value;
+
+  if (select === 'custom') {
+    document.getElementById('configFile').click();
+    return;
+  }
+
+  await loadConfig(select);
+  saveCache();
+}
+
+// 初始化配置（兼容旧的 loadConfigSelect 调用）
+async function loadConfigSelect() {
+  await loadConfigIndex();
+  
+  // 尝试从缓存恢复选择的配置
+  const cached = localStorage.getItem(CACHE_KEY);
+  let selectedConfig = 'lbanken';
+  if (cached) {
+    try {
+      const cache = JSON.parse(cached);
+      if (cache.configSelect && cache.configSelect !== 'custom') {
+        selectedConfig = cache.configSelect;
+      }
+    } catch (e) {}
+  }
+  
+  document.getElementById('configSelect').value = selectedConfig;
+  await loadConfig(selectedConfig);
+}
+
+function importConfig(e) {
+  const file = e.target.files[0];
+  if (!file) {
+    document.getElementById('configSelect').value = 'lbanken';
+    loadConfig('lbanken');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = JSON.parse(evt.target.result);
+
+      currentConfig = {
+        name: '自定义',
+        width: data.width || 1050,
+        height: data.height || 1696,
+        dateFormat: data.dateFormat || 'YYYY-MM-DD HH:mm:ss',
+        displayTexts: data.displayTexts || lbankenConfig.displayTexts,
+        dynamicColors: data.dynamicColors || lbankenConfig.dynamicColors,
+        profitColor: data.profitColor || '#279E55',
+        lossColor: data.lossColor || '#FF6B6B',
+        qrcode: data.qrcode || lbankenConfig.qrcode,
+        layers: data.layers || []
+      };
+
       document.getElementById('previewSize').textContent = `${currentConfig.width} × ${currentConfig.height}`;
       document.getElementById('configName').textContent = `✅ 已导入: ${file.name}`;
       document.getElementById('configSelect').value = 'custom';
-      
+
       initCanvas();
       renderPreview();
     } catch (err) {
       alert('配置文件格式错误: ' + err.message);
       document.getElementById('configSelect').value = 'lbanken';
-      loadConfigSelect();
+      loadConfig('lbanken');
     }
   };
   reader.readAsText(file);
@@ -875,7 +1013,7 @@ async function generateImage() {
   btn.innerHTML = '<span class="spinner"></span> 生成中...';
   
   try {
-    if (!currentConfig) loadConfigSelect();
+    if (!currentConfig) await loadConfig('lbanken');
     
     const vars = getVariables();
     const renderContainer = document.getElementById('renderContainer');

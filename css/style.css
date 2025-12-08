@@ -368,7 +368,7 @@ body {
   color: var(--text-secondary);
 }
 
-.edit-toolbar-inline input {
+.edit-toolbar-inline input[type="number"] {
   width: 50px;
   padding: 3px 6px;
   background: var(--bg-primary);
@@ -378,7 +378,27 @@ body {
   font-size: 11px;
 }
 
-.edit-toolbar-inline input:focus {
+.edit-toolbar-inline input[type="text"] {
+  width: 140px;
+  padding: 3px 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.edit-toolbar-inline select {
+  padding: 3px 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.edit-toolbar-inline input:focus,
+.edit-toolbar-inline select:focus {
   outline: none;
   border-color: var(--accent-purple);
 }
