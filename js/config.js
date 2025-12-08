@@ -8,7 +8,7 @@ const lbankenConfig = {
   name: 'LBanken',
   width: 1050,
   height: 1696,
-  dateFormat: 'YYYY-MM-DD HH:mm',
+  dateFormat: 'YYYY-MM-DD HH:mm:ss',
   displayTexts: {
     long: 'Long', short: 'Short',
     open_long: 'Open Long', open_short: 'Open Short',
