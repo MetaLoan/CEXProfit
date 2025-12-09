@@ -21,13 +21,14 @@
       <div class="form-group">
         <label>📂 配置模板</label>
         <div style="display:flex;gap:8px;">
-          <select id="configSelect" style="flex:1;" onchange="onConfigSelectChange()">
-            <!-- 选项由 JS 动态生成 -->
+          <select id="configSelect" style="flex:1;" onchange="loadConfigSelect()">
+            <option value="lbanken">LBanken (内置)</option>
+            <option value="custom">自定义配置...</option>
           </select>
           <button class="btn-small" onclick="document.getElementById('configFile').click()">导入</button>
         </div>
         <input type="file" id="configFile" accept=".json" style="display:none" onchange="importConfig(event)">
-        <div class="hint" id="configName">加载中...</div>
+        <div class="hint" id="configName">使用内置 LBanken 配置</div>
       </div>
 
       <!-- 交易对输入 -->
@@ -114,11 +115,11 @@
       <div id="autoCalcSection" style="display:none;">
         <div class="form-group">
           <label>开仓时间</label>
-          <input type="datetime-local" id="entTime" step="1">
+          <input type="datetime-local" id="entTime">
         </div>
         <div class="form-group">
           <label>平仓时间</label>
-          <input type="datetime-local" id="closeTime" step="1">
+          <input type="datetime-local" id="closeTime">
         </div>
         <button class="btn-calc" onclick="fetchPrices()">
           <span>📡</span> 获取历史价格
@@ -130,7 +131,7 @@
       <div class="form-group">
         <label>显示时间</label>
         <div style="display:flex;gap:8px;align-items:center;">
-          <input type="datetime-local" id="displayTime" step="1" style="flex:1;" disabled>
+          <input type="datetime-local" id="displayTime" style="flex:1;" disabled>
           <button class="btn-small" id="editTimeBtn" onclick="toggleManualTime()">✏️ 编辑</button>
         </div>
         <div class="hint" id="timeHint">自动同步平仓时间 + 时区转换</div>
@@ -199,61 +200,25 @@
     <!-- 右侧预览区 -->
     <div class="preview-panel">
       <div class="preview-header">
-        <div class="preview-header-left">
-          <span>📱 实时预览</span>
-          <label class="edit-mode-toggle">
-            <input type="checkbox" id="editMode" onchange="toggleEditMode()">
-            <span class="edit-toggle-slider"></span>
-            <span class="edit-toggle-label">编辑模式</span>
-          </label>
-        </div>
-        <!-- 编辑工具栏 - 内嵌在头部 -->
-        <div class="edit-toolbar-inline" id="editToolbar" style="display:none;">
-          <span id="selectedLayerName">未选中</span>
-          <span class="layer-coords" id="layerCoords"></span>
-          <label>X:<input type="number" id="layerX" onchange="updateLayerPosition()"></label>
-          <label>Y:<input type="number" id="layerY" onchange="updateLayerPosition()"></label>
-          <label id="fontSizeLabel" style="display:none;">字号:<input type="number" id="layerFontSize" min="8" max="200" onchange="updateLayerStyle()"></label>
-          <label id="fontWeightLabel" style="display:none;">字重:<select id="layerFontWeight" onchange="updateLayerStyle()">
-            <option value="100">100 Thin</option>
-            <option value="300">300 Light</option>
-            <option value="400">400 Regular</option>
-            <option value="500">500 Medium</option>
-            <option value="600">600 Semi</option>
-            <option value="700">700 Bold</option>
-            <option value="900">900 Black</option>
-          </select></label>
-          <label id="letterSpacingLabel" style="display:none;">间距:<input type="number" id="layerLetterSpacing" step="0.1" onchange="updateLayerStyle()"></label>
-          <label id="textContentLabel" style="display:none;">内容:<input type="text" id="layerTextContent" onchange="updateLayerStyle()"></label>
-          <label id="qrSizeLabel" style="display:none;">尺寸:<input type="number" id="layerQrSize" min="50" max="300" onchange="updateLayerStyle()"></label>
-          <button class="btn-tool" onclick="resetLayerPositions()" title="重置">↺</button>
-          <button class="btn-tool btn-save" onclick="saveLayerPositions()" title="保存">💾</button>
-          <button class="btn-tool btn-export" onclick="exportConfig()" title="导出配置">📤</button>
-        </div>
-        <div class="preview-controls">
-          <div class="zoom-controls">
-            <button onclick="zoomCanvas(-0.1)" title="缩小">−</button>
-            <span id="zoomValue">50%</span>
-            <button onclick="zoomCanvas(0.1)" title="放大">+</button>
-            <button onclick="resetZoom()" title="重置">⟲</button>
+        <span>📱 图片预览</span>
+        <span id="previewSize">750 × 1240</span>
+      </div>
+      <div class="preview-container">
+        <div id="previewArea" class="preview-placeholder">
+          <div class="placeholder-content">
+            <div class="placeholder-icon">🖼️</div>
+            <p>填写参数后点击「生成晒单图」</p>
+            <p style="font-size:12px;margin-top:8px;opacity:0.7;">配置自动保存，刷新后可恢复</p>
           </div>
-          <span id="previewSize">1050 × 1696</span>
         </div>
+        <div id="renderContainer" style="position: absolute; left: -9999px; top: 0;"></div>
       </div>
-      <div class="preview-container" id="previewContainer">
-        <div class="canvas-wrapper" id="canvasWrapper">
-          <img class="canvas-bg" id="canvasBg" src="" alt="背景">
-          <div class="layer-overlay" id="layerOverlay"></div>
-        </div>
-      </div>
-      <div id="renderContainer" style="position: absolute; left: -9999px; top: 0;"></div>
     </div>
   </div>
 
   <script src="js/html2canvas.min.js"></script>
   <script src="js/qrcode.min.js"></script>
   <script src="js/backgrounds.js"></script>
-  <script src="js/config.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
