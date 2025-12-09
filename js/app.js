@@ -81,11 +81,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupInputListeners();
   document.addEventListener('keydown', handleKeydown);
   
-  // 初始化画布
-  initCanvas();
-  
-  // 初始渲染
+  // 初始渲染 & 自适应缩放
   renderPreview();
+  autoFitZoom();
+
+  // 窗口尺寸变化时重新自适应
+  window.addEventListener('resize', autoFitZoom);
 });
 
 // 设置输入监听，实时更新预览
@@ -112,16 +113,13 @@ function debounce(fn, delay) {
 // 初始化画布
 function initCanvas() {
   if (!currentConfig) return;
-  
-  const wrapper = document.getElementById('canvasWrapper');
-  wrapper.style.width = currentConfig.width + 'px';
-  wrapper.style.height = currentConfig.height + 'px';
-  
+
   // 加载背景图
   const bg = document.getElementById('canvasBg');
   bg.src = customBgDataUrl || DEFAULT_BG_BASE64 || DEFAULT_BG_PATH;
-  
-  applyZoom();
+
+  // 初始化时按容器宽度自适应缩放（等比例，且不超过 100%）
+  autoFitZoom();
 }
 
 // ==================== 编辑模式 ====================
@@ -146,21 +144,64 @@ function toggleEditMode() {
 
 // ==================== 缩放控制 ====================
 
+// 根据预览容器宽度自动计算缩放比例，保证宽度撑满但不超过 100%
+function autoFitZoom() {
+  const wrapper = document.getElementById('canvasWrapper');
+  const container = document.getElementById('previewContainer');
+  if (!wrapper || !container || !currentConfig) return;
+
+  const containerWidth = container.clientWidth || container.offsetWidth;
+  if (!containerWidth) return;
+
+  const baseWidth = currentConfig.width;
+  const targetScale = Math.min(1, (containerWidth - 24) / baseWidth); // 预留一点内边距
+  scale = targetScale > 0 ? targetScale : 1;
+  applyZoom();
+}
+
 function zoomCanvas(delta) {
-  scale = Math.max(0.2, Math.min(1.5, scale + delta));
+  // 在当前基础上手动缩放：最小 20%，最大 200%
+  scale = Math.max(0.2, Math.min(2, scale + delta));
   applyZoom();
 }
 
 function resetZoom() {
-  scale = 1.0;
-  applyZoom();
+  // 重置回自适应宽度
+  autoFitZoom();
 }
 
 function applyZoom() {
-  document.getElementById('zoomValue').textContent = Math.round(scale * 100) + '%';
   const wrapper = document.getElementById('canvasWrapper');
-  wrapper.style.transform = `scale(${scale})`;
-  wrapper.style.transformOrigin = 'top center';
+  if (!wrapper || !currentConfig) return;
+  
+  // 计算缩放后的实际尺寸
+  const scaledWidth = currentConfig.width * scale;
+  const scaledHeight = currentConfig.height * scale;
+  
+  // 设置包装器的实际尺寸为缩放后的尺寸
+  wrapper.style.width = scaledWidth + 'px';
+  wrapper.style.height = scaledHeight + 'px';
+  
+  // 内部元素保持原始尺寸，用 transform 缩放
+  const bg = document.getElementById('canvasBg');
+  const overlay = document.getElementById('layerOverlay');
+  
+  if (bg) {
+    bg.style.width = currentConfig.width + 'px';
+    bg.style.height = currentConfig.height + 'px';
+    bg.style.transform = `scale(${scale})`;
+    bg.style.transformOrigin = 'top left';
+  }
+  
+  if (overlay) {
+    overlay.style.width = currentConfig.width + 'px';
+    overlay.style.height = currentConfig.height + 'px';
+    overlay.style.transform = `scale(${scale})`;
+    overlay.style.transformOrigin = 'top left';
+  }
+  
+  const zoomEl = document.getElementById('zoomValue');
+  if (zoomEl) zoomEl.textContent = Math.round(scale * 100) + '%';
 }
 
 // ==================== 实时预览渲染 ====================
