@@ -702,22 +702,31 @@ body {
 /* 响应式 */
 @media (max-width: 900px) {
   .app {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
 
   .control-panel {
+    flex-shrink: 0;
     max-height: none;
+    overflow: visible;
     border-right: none;
     border-bottom: 1px solid var(--border-color);
   }
 
   .preview-panel {
+    flex-shrink: 0;
     height: auto;
+    overflow: visible;
   }
 
   .preview-container {
     padding: 12px 8px;
+    overflow: visible;
+    min-height: auto;
   }
 
   .canvas-wrapper {
@@ -731,5 +740,11 @@ body {
 
   .edit-toolbar-inline {
     flex-wrap: wrap;
+  }
+
+  .preview-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
   }
 }
