@@ -1016,7 +1016,7 @@ async function fetchPrices() {
       
       document.getElementById('yield').value = yieldPercent.toFixed(2);
       
-      hint.innerHTML = `✅ 价格获取成功！开仓: ${entPriceData.toFixed(2)} → 平仓: ${closePriceData.toFixed(2)}`;
+      hint.innerHTML = `✅ 价格获取成功！开仓: ${formatNumber(entPriceData)} → 平仓: ${formatNumber(closePriceData)}`;
       hint.style.color = '#279E55';
       
       saveCache();

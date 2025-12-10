@@ -33,12 +33,18 @@ function replaceVars(text, vars) {
   return text.replace(/\{\{(\w+)\}\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m);
 }
 
-// 格式化数字
+// 格式化数字（带千分符）
 function formatNumber(num) {
   const n = parseFloat(num);
-  if (n >= 100) return n.toFixed(2);
-  if (n >= 10) return n.toFixed(3);
-  return n.toFixed(4);
+  let fixed;
+  if (n >= 100) fixed = n.toFixed(2);
+  else if (n >= 10) fixed = n.toFixed(3);
+  else fixed = n.toFixed(4);
+  
+  // 添加千分符
+  const parts = fixed.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
 }
 
 // 格式化显示日期
